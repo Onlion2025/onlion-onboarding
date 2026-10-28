@@ -2,7 +2,18 @@
 (function(){
   const rows = new Map(); // key collection/id -> {collection,id,data}
   window.__rows = rows;
+  window.__team = [{email:'adam@test.de', role:'owner'}, {email:'a@b.de', role:'member'}];
+  window.__pw = 'richtig';
   function q(table){
+    if (table === 'team') {
+      // RLS nachgebaut: nur Team-Mitglieder sehen die Team-Liste
+      const api = { select(){ return api; }, then(res, rej){
+        const me = session && String(session.user.email).toLowerCase();
+        const vis = window.__team.some(m => m.email === me) ? JSON.parse(JSON.stringify(window.__team)) : [];
+        return Promise.resolve({data: vis, error: null}).then(res, rej);
+      } };
+      return api;
+    }
     const f = {}; let mode = 'select', payload = null;
     const api = {
       select(){ mode = mode === 'delete' ? 'delete' : 'select'; return api; },
@@ -24,12 +35,16 @@
     return api;
   }
   let session = null;
+  // Link aus E-Mail nachgebaut: #access_token=…&type=invite&mock_email=…
+  const hp = new URLSearchParams(location.hash.replace(/^#/, ''));
+  if (hp.get('access_token')) session = {user:{email: hp.get('mock_email')}, access_token: 'tok'};
   window.supabase = { createClient(){ return {
     from: q,
     channel(){ return { on(){ return this; }, subscribe(){ return this; } }; },
     auth: {
       async getSession(){ return {data:{session}}; },
-      async signInWithPassword({email, password}){ if (password === 'falsch') return {data:{}, error:{message:'invalid'}}; session = {user:{email}, access_token:'tok'}; return {data:{session}, error:null}; },
+      async updateUser({password}){ window.__pwChanges = (window.__pwChanges || 0) + 1; window.__pw = password; return {data:{}, error:null}; },
+      async signInWithPassword({email, password}){ if (password !== window.__pw) return {data:{}, error:{message:'invalid'}}; session = {user:{email}, access_token:'tok'}; return {data:{session}, error:null}; },
       async signOut(){ session = null; },
       onAuthStateChange(){ return {data:{subscription:{unsubscribe(){}}}}; }
     }

@@ -12,11 +12,16 @@ Web-App für die Kundenaufnahme. Mit ihr erfasst du Fragenkatalog, Datenschutz u
 1. Auf supabase.com ein Konto anlegen und dann **New project** wählen.
 2. Region in der EU wählen (Frankfurt oder Irland), Datenbank-Passwort sicher ablegen.
 3. Links **SQL Editor** → **New query** öffnen, den Inhalt von `supabase/schema.sql` einfügen und auf **Run** klicken.
-   Das legt die Tabelle, den Zugriffsschutz und die Startdaten an: Vorlage mit 28 Fragen, Rechtstext-Entwürfe und den Kunden VR-ImmoService.
+   Das legt die Tabelle und die Startdaten an: Vorlage mit 28 Fragen, Rechtstext-Entwürfe und den Kunden VR-ImmoService.
+4. Danach eine neue Query mit dem Inhalt von `supabase/team.sql` ausführen. Das legt die Team-Liste an und sorgt dafür, dass nur Konten aus dem Team Daten sehen.
 
-### 2. Login nur für dich
+### 2. Login und Team
 1. Unter **Authentication → Sign In / Providers** den Schalter **„Allow new users to sign up“ ausschalten**. Je nach Dashboard-Version kann der Menüpunkt leicht anders heißen.
 2. Unter **Authentication → Users** auf **Add user** klicken, deine E-Mail und ein starkes Passwort eintragen und „Auto confirm“ anhaken.
+3. Unter **Authentication → URL Configuration** als **Site URL** die App-Adresse eintragen (`https://kionboarding.netlify.app`). Dorthin führen die Links aus Einladungs- und Passwort-E-Mails.
+4. Optional unter **Authentication → Providers → Email** die Gültigkeit der E-Mail-Links (Email OTP Expiration) auf bis zu 86400 Sekunden (24 Stunden) erhöhen. Standard ist eine Stunde.
+
+Weitere Personen (z. B. Partner) lädst du in der App unter **Konto & Team** ein. Die Registrierung bleibt aus; niemand kann sich selbst ein Konto anlegen.
 
 ### 3. Zugang in die App eintragen
 1. In Supabase **Project Settings → API** öffnen.
@@ -60,11 +65,12 @@ In Netlify unter **Site configuration → Environment variables** diese Werte an
 | `BREVO_API_KEY` | API-Schlüssel aus Brevo |
 | `BREVO_SENDER_EMAIL` | verifizierte Absenderadresse, z. B. info@deine-domain.de |
 | `BREVO_SENDER_NAME` | `ONLION` |
-| `ALLOWED_USER_EMAIL` | die E-Mail deines Supabase-Logins. Nur dieses Konto darf senden und Belege anlegen. |
+| `ALLOWED_USER_EMAIL` | die E-Mail des Inhaber-Kontos. Nur dieses Konto darf das Team verwalten. |
+| `SUPABASE_SERVICE_ROLE_KEY` | **service_role**-Schlüssel aus Supabase (Project Settings → API). Nur hier eintragen, als Secret markieren, nie in `config.js`. Wird für Einladungen, „Passwort vergessen?“ und die Team-Prüfung gebraucht. |
 | `OWNER_EMAIL` | deine Adresse für eine Blindkopie jeder Mail |
 | `REPLY_TO_EMAIL` | optional: Adresse für Antworten |
 
-Jede Anfrage an Brevo prüft vorher, dass genau dein Konto angemeldet ist. Die Schlüssel verlassen den Server nie.
+Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist. Die Schlüssel verlassen den Server nie.
 
 ---
 
@@ -77,6 +83,8 @@ Jede Anfrage an Brevo prüft vorher, dass genau dein Konto angemeldet ist. Die S
 - **Angebot:** Positionen aus Bausteinen wählen (Potenzialanalyse, Pilot, Betrieb) oder frei anlegen, Preise anpassen, Summen mit 19 % USt sehen. Das verbindliche Angebot und die Rechnung erstellst du in deinem Buchhaltungsprogramm.
 - **Gesprächsfortschritt:** Prozentbalken über Stammdaten, Fragen und Datenschutz-Pflichtangaben. Offene ★-Fragen werden einzeln genannt.
 - **Vorlagen & Rechtstexte:** Fragen und Texte bearbeiten. Die Änderungen gelten für alle Kunden.
+- **Konto & Team:** eigenes Passwort ändern (mit aktuellem Passwort bestätigt). Als Inhaber Personen per E-Mail einladen, den Link erneut senden oder den Zugang entfernen. Eingeladene legen ihr Passwort über den Link selbst fest und sehen alle Kunden.
+- **Passwort vergessen?** auf der Anmeldeseite schickt einen Link zum Neusetzen, aber nur an Adressen aus dem Team.
 
 ## Wichtig
 - Die **Rechtstexte sind Entwürfe**. Lass sie vor dem ersten echten Einsatz anwaltlich prüfen.
@@ -89,6 +97,9 @@ Jede Anfrage an Brevo prüft vorher, dass genau dein Konto angemeldet ist. Die S
 ## Aufbau
 - `index.html`: die App. Sie läuft im Browser und braucht keinen Build-Schritt.
 - `netlify/functions/send-pdf.js`: E-Mail-Versand über Brevo
+- `netlify/functions/team.js`: Einladen und Entfernen (nur Inhaber)
+- `netlify/functions/reset-password.js`: Link für „Passwort vergessen?“
+- `supabase/team.sql`: Team-Liste und Zugriffsschutz
 - `supabase/schema.sql`: Datenbank, Zugriffsschutz und Startdaten
 - `sw.js`, `manifest.webmanifest`, `icon-*.png`: Installation als App
 

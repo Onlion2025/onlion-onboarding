@@ -10,17 +10,16 @@ create table if not exists public.docs (
   primary key (collection, id)
 );
 
--- 2) Zugriffsschutz: nur angemeldete Nutzer. Registrierung in Supabase AUSSCHALTEN,
---    dann ist das nur dein eigenes Konto.
+-- 2) Zugriffsschutz: nur Konten aus dem Team (siehe supabase/team.sql).
+--    Registrierung in Supabase AUSSCHALTEN; neue Personen lädst du in der App ein.
 alter table public.docs enable row level security;
-drop policy if exists "Nur angemeldete Nutzer" on public.docs;
-create policy "Nur angemeldete Nutzer" on public.docs
-  for all to authenticated using (true) with check (true);
 
 -- 3) Live-Aktualisierung zwischen iPad und Laptop
 do $$ begin
   alter publication supabase_realtime add table public.docs;
 exception when duplicate_object then null; end $$;
+
+-- Danach supabase/team.sql ausführen (Team-Liste und Policies).
 
 -- 4) Startdaten: Vorlage KI-Telefon-Agent, Rechtstext-Entwürfe, Kunde VR-ImmoService
 insert into public.docs (collection, id, data) values

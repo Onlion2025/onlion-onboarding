@@ -129,6 +129,75 @@ try:
             sw = mob.evaluate('document.documentElement.scrollWidth')
             ok('Handy %s ohne Querscrollen (%d)' % (name, sw), sw <= 390)
             mob.screenshot(path=T + '/' + name + '.png', full_page=True)
+
+        # ---------- Konto & Team ----------
+        page.set_viewport_size({'width': 1194, 'height': 834})
+        page.click('#navKonto'); page.wait_for_selector('#pc-old')
+        ok('Konto-Seite zeigt Inhaber', 'Inhaber' in page.inner_text('#view') and 'adam@test.de' in page.inner_text('#view'))
+        ok('Team-Liste mit Mitglied', 'a@b.de' in page.inner_text('#view'))
+        page.fill('#pc-old', 'falsch'); page.fill('#pc-new', 'NeuesPasswort1'); page.fill('#pc-rep', 'NeuesPasswort1'); page.click('button:has-text("Passwort ändern")')
+        page.wait_for_selector('text=Das aktuelle Passwort stimmt nicht.')
+        ok('Falsches aktuelles Passwort abgelehnt', page.evaluate('window.__pw') == 'richtig')
+        page.fill('#pc-old', 'richtig'); page.fill('#pc-new', 'kurz'); page.fill('#pc-rep', 'kurz'); page.click('button:has-text("Passwort ändern")')
+        page.wait_for_selector('#pc-msg:has-text("braucht mindestens 10 Zeichen")')
+        page.fill('#pc-new', 'NeuesPasswort1'); page.fill('#pc-rep', 'Anderes12345'); page.click('button:has-text("Passwort ändern")')
+        page.wait_for_selector('text=stimmen nicht überein')
+        page.fill('#pc-new', 'NeuesPasswort1'); page.fill('#pc-rep', 'NeuesPasswort1'); page.click('button:has-text("Passwort ändern")')
+        page.wait_for_selector('text=Passwort geändert')
+        ok('Passwort geändert', page.evaluate('window.__pw') == 'NeuesPasswort1')
+        page.fill('#inv-mail', 'Partner@Beispiel.de'); page.click('button:has-text("Einladen")')
+        page.wait_for_selector('text=Einladung an partner@beispiel.de gesendet')
+        ok('Einladung über Server-Funktion', any('/functions/team' in u and a == 'Bearer tok' and '"invite"' in (d or '') and 'partner@beispiel.de' in (d or '') for u, a, d in fncalls))
+        page.click('.member:has-text("a@b.de") >> button:has-text("Entfernen")'); page.wait_for_selector('.confirm')
+        page.click('.confirm >> button:has-text("Entfernen")'); page.wait_for_timeout(300)
+        ok('Entfernen über Server-Funktion', any('/functions/team' in u and '"remove"' in (d or '') and 'a@b.de' in (d or '') for u, a, d in fncalls))
+        page.screenshot(path=T + '/k-konto.png', full_page=True)
+        page.set_viewport_size({'width': 390, 'height': 844}); page.wait_for_timeout(200)
+        sw = page.evaluate('document.documentElement.scrollWidth')
+        ok('Konto-Seite Handy ohne Querscrollen (%d)' % sw, sw <= 390)
+        page.screenshot(path=T + '/k-konto-handy.png', full_page=True)
+        page.set_viewport_size({'width': 1194, 'height': 834})
+
+        def fresh(url):
+            pg = ctx.new_page(); pg.on('pageerror', lambda e: errors.append(str(e)))
+            calls = []
+            pg.route('**/supabase.min.js', lambda r: r.fulfill(path=T+'/mock-supabase.js', content_type='application/javascript'))
+            pg.route('**/jspdf.umd.min.js', lambda r: r.fulfill(path=T+'/node_modules/jspdf/dist/jspdf.umd.min.js', content_type='application/javascript'))
+            pg.route('**/config.js', lambda r: r.fulfill(body='window.ONLION_CONFIG={supabaseUrl:"https://test.supabase.co",supabaseAnonKey:"x"};', content_type='application/javascript'))
+            pg.route('https://fonts.googleapis.com/**', lambda r: r.abort())
+            def fr(r):
+                calls.append((r.request.url, r.request.headers.get('authorization'), r.request.post_data)); r.fulfill(status=200, content_type='application/json', body='{"ok":true}')
+            pg.route('**/.netlify/functions/**', fr)
+            pg.goto(url)
+            return pg, calls
+
+        # Einladungslink: Passwort festlegen, dann App
+        inv, _ = fresh('http://localhost:8765/index.html#access_token=x&type=invite&mock_email=a@b.de')
+        inv.wait_for_selector('#pwForm:not([hidden])')
+        ok('Einladungslink zeigt „Passwort festlegen“', 'Passwort festlegen' in inv.inner_text('#pw-title') and 'a@b.de' in inv.inner_text('#pw-who'))
+        ok('Token aus Adresse entfernt', '#' not in inv.url)
+        inv.fill('#pw-new', 'PartnerPasswort1'); inv.fill('#pw-rep', 'PartnerPasswort1'); inv.click('#pw-btn')
+        inv.wait_for_selector('#login', state='hidden'); inv.wait_for_timeout(300)
+        inv.click('#navKonto'); inv.wait_for_selector('#pc-old')
+        ok('Mitglied sieht Konto, aber kein Einladen', 'Mitglied' in inv.inner_text('#view') and inv.query_selector('#inv-mail') is None and inv.query_selector('.member button') is None)
+        inv.screenshot(path=T + '/k-mitglied.png', full_page=True)
+
+        # Fremdes Konto: kein Zugriff
+        fr_, _ = fresh('http://localhost:8765/index.html')
+        fr_.wait_for_selector('#loginForm'); fr_.fill('#lg-mail', 'fremd@x.de'); fr_.fill('#lg-pw', 'richtig'); fr_.click('#lg-btn')
+        fr_.wait_for_selector('h1:has-text("Kein Zugriff")')
+        ok('Fremdes Konto sieht „Kein Zugriff“', fr_.is_hidden('#custGroup') and fr_.is_hidden('#navKonto'))
+
+        # Passwort vergessen
+        fg, fgc = fresh('http://localhost:8765/index.html')
+        fg.wait_for_selector('#loginForm'); fg.click('#lg-forgot'); fg.wait_for_selector('text=Bitte zuerst oben deine E-Mail')
+        fg.fill('#lg-mail', 'a@b.de'); fg.click('#lg-forgot'); fg.wait_for_selector('text=kommt gleich eine E-Mail')
+        ok('Passwort vergessen ruft reset-password', any('reset-password' in u and 'a@b.de' in (d or '') for u, a, d in fgc))
+
+        # Abgelaufener Link
+        ex, _ = fresh('http://localhost:8765/index.html#error=access_denied&error_description=Email+link+is+invalid+or+has+expired')
+        ex.wait_for_selector('#lg-err:not([hidden])')
+        ok('Abgelaufener Link erklärt', 'abgelaufen' in ex.inner_text('#lg-err'))
         ok('Keine JS-Fehler ' + '; '.join(errors), not errors)
         b.close()
 finally:

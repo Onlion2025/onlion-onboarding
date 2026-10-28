@@ -129,6 +129,11 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
 .toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--lime);color:var(--lime-ink);padding:12px 16px;border-radius:12px;font-weight:600;z-index:20}
 .tpl-q{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;word-break:break-all;color:var(--muted)}
+.linkbtn{background:none;border:0;padding:8px 0;min-height:44px;color:var(--accent-ink);font-weight:600;cursor:pointer;text-align:left;align-self:flex-start;text-decoration:underline;text-underline-offset:3px}
+.member{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:12px}
+.member .who{flex:1 1 220px;min-width:0;overflow-wrap:anywhere}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--panel2);color:var(--muted);margin-left:8px}
+.tag.lime{background:var(--lime);color:var(--lime-ink)}
 .confirm{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#fff1ef;border:1px solid #f1b8b0;border-radius:12px;padding:10px 12px}
 @media (max-width:1319px){.stage .t{font-size:15px}}
 @media (max-width:1149px){.stages{grid-template-columns:repeat(6,minmax(0,1fr))}.stages>li{grid-column:span 2}.stages>li:nth-child(4),.stages>li:nth-child(5){grid-column:span 3}.stage .t{font-size:17px}}
@@ -161,12 +166,23 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
     <div class="field"><label for="lg-pw">Passwort</label><input type="password" id="lg-pw" autocomplete="current-password" required></div>
     <div id="lg-err" class="banner warn" hidden></div>
     <button class="btn primary" type="submit" id="lg-btn">Anmelden</button>
+    <button class="linkbtn" type="button" id="lg-forgot">Passwort vergessen?</button>
+  </form>
+  <form class="card login-card" id="pwForm" hidden>
+    <img src="logo-black.png" alt="ONLION" style="width:170px">
+    <h2 id="pw-title">Passwort festlegen</h2>
+    <div class="eyebrow" id="pw-who"></div>
+    <div class="field"><label for="pw-new">Neues Passwort</label><input type="password" id="pw-new" autocomplete="new-password" required></div>
+    <div class="field"><label for="pw-rep">Passwort wiederholen</label><input type="password" id="pw-rep" autocomplete="new-password" required></div>
+    <div class="eyebrow">Mindestens 10 Zeichen.</div>
+    <div id="pw-err" class="banner warn" hidden></div>
+    <button class="btn primary" type="submit" id="pw-btn">Speichern und weiter</button>
   </form>
 </div>
 <div class="app">
   <nav class="side" aria-label="Navigation">
     <div class="brand"><img src="logo-black.png" alt="ONLION"><div class="prod" id="prodName">KI-Telefon-Agent</div></div>
-    <div class="group">
+    <div class="group" id="custGroup">
       <div class="label">Kunden</div>
       <div id="custList"></div>
       <div id="newCustBox"></div>
@@ -178,6 +194,7 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
     <div class="group settings">
       <div class="label">Einstellungen</div>
       <button class="navbtn" id="navTpl" type="button">Vorlagen &amp; Rechtstexte</button>
+      <button class="navbtn" id="navKonto" type="button">Konto &amp; Team</button>
       <button class="navbtn" id="logoutBtn" type="button">Abmelden</button>
     </div>
   </nav>
@@ -199,7 +216,8 @@ const STAGES=[
   {id:'angebot',t:'Angebot'}
 ];
 const STORAGE_OPTS=['Nur als Text, 90 Tage','Audio und Text, 30 Tage','Nicht speichern'];
-const S={db:null,dl:null,customers:[],tpl:null,legal:null,curId:null,view:'start',section:0,newOpen:false,loaded:false,pendingRender:false,confirm:null,pads:{}};
+const SETTINGS=['vorlagen','konto'];
+const S={me:null,team:[],blocked:false,db:null,dl:null,customers:[],tpl:null,legal:null,curId:null,view:'start',section:0,newOpen:false,loaded:false,pendingRender:false,confirm:null,pads:{}};
 
 function h(tag,attrs,...kids){
   const el=document.createElement(tag);
@@ -293,7 +311,7 @@ function renderSide(){
   const list=document.getElementById('custList');list.replaceChildren();
   if(!S.loaded)list.append(h('div',{class:'eyebrow',text:'Lade Kunden …'}));
   for(const c of S.customers){
-    list.append(h('button',{type:'button',class:'navbtn'+(c.id===S.curId&&S.view!=='vorlagen'?' on':''),onclick:()=>{S.curId=c.id;S.view='start';render();}},c.firma||'Ohne Namen',h('small',null,signed(c)?'unterschrieben':(progress(c).pct+' % erfasst'))));
+    list.append(h('button',{type:'button',class:'navbtn'+(c.id===S.curId&&!SETTINGS.includes(S.view)?' on':''),onclick:()=>{S.curId=c.id;S.view='start';render();}},c.firma||'Ohne Namen',h('small',null,signed(c)?'unterschrieben':(progress(c).pct+' % erfasst'))));
   }
   const nb=document.getElementById('newCustBox');nb.replaceChildren();
   if(!S.db){nb.append(h('div',{class:'eyebrow',text:'Speichern ist in dieser Ansicht nicht verfügbar.'}));}
@@ -305,8 +323,8 @@ function renderSide(){
     nb.append(form);
   }
   const fn=document.getElementById('flowNav'),fl=document.getElementById('flowList'),c=cur();
-  fn.hidden=!c||S.view==='vorlagen';fl.replaceChildren();
-  if(c&&S.view!=='vorlagen'){
+  fn.hidden=!c||SETTINGS.includes(S.view)||S.blocked;fl.replaceChildren();
+  if(c&&!SETTINGS.includes(S.view)&&!S.blocked){
     fl.append(h('button',{type:'button',class:'navbtn'+(S.view==='start'?' on':''),onclick:()=>{S.view='start';render();}},'Übersicht'));
     STAGES.forEach((st,i)=>{
       const state=stageState(c,st.id);
@@ -314,6 +332,9 @@ function renderSide(){
     });
   }
   document.getElementById('navTpl').className='navbtn'+(S.view==='vorlagen'?' on':'');
+  document.getElementById('navKonto').className='navbtn'+(S.view==='konto'?' on':'');
+  document.getElementById('custGroup').hidden=S.blocked;
+  document.getElementById('navTpl').hidden=S.blocked;document.getElementById('navKonto').hidden=S.blocked;
 }
 
 /* ---------- views ---------- */
@@ -714,6 +735,84 @@ function viewVorlagen(){
   return out;
 }
 
+/* ---------- Konto & Team ---------- */
+async function loadTeam(){
+  const {data,error}=await S.sb.from('team').select('email,role,added_at');
+  if(error)throw error;
+  S.team=(data||[]).sort((a,b)=>(a.role==='owner'?-1:b.role==='owner'?1:0)||String(a.email).localeCompare(String(b.email)));
+  return S.team;
+}
+function pwField(id,label,ac){return h('div',{class:'field'},h('label',{for:id},label),h('input',{type:'password',id,autocomplete:ac,required:true}));}
+function pwProblem(a,b){if(a.length<10)return 'Das neue Passwort braucht mindestens 10 Zeichen.';if(a!==b)return 'Die beiden neuen Passwörter stimmen nicht überein.';return '';}
+function pwErrorText(e){const m=String(e&&e.message||e||'');if(/different/i.test(m))return 'Bitte ein anderes Passwort als bisher wählen.';if(/weak|short|characters/i.test(m))return 'Das Passwort ist zu schwach. Bitte länger oder gemischter wählen.';return 'Das hat nicht geklappt: '+m;}
+function viewKonto(){
+  const me=S.me||{email:'',role:'member'};const owner=me.role==='owner';
+  const out=[h('div',null,h('div',{class:'eyebrow'},'Einstellungen'),h('h1',null,'Konto & Team'))];
+  // Passwort ändern
+  const msg=h('div',{id:'pc-msg',class:'banner '+(S.pwMsg?S.pwMsg[0]:'warn'),hidden:!S.pwMsg},S.pwMsg?S.pwMsg[1]:'');
+  const say=(cls,t)=>{S.pwMsg=[cls,t];const m=document.getElementById('pc-msg')||msg;m.className='banner '+cls;m.textContent=t;m.hidden=false;};
+  const form=h('form',{class:'card',onsubmit:async e=>{
+    e.preventDefault();msg.hidden=true;S.pwMsg=null;
+    const old=document.getElementById('pc-old').value,a=document.getElementById('pc-new').value,b=document.getElementById('pc-rep').value;
+    const p=pwProblem(a,b);if(p){say('warn',p);return;}
+    const btn=form.querySelector('button[type=submit]');btn.disabled=true;btn.textContent='Speichere …';
+    try{
+      const chk=await S.sb.auth.signInWithPassword({email:me.email,password:old});
+      if(chk.error){say('warn','Das aktuelle Passwort stimmt nicht.');return;}
+      const {error}=await S.sb.auth.updateUser({password:a});
+      if(error){say('warn',pwErrorText(error));return;}
+      (document.getElementById('pc-new')&&document.getElementById('pc-new').form||form).reset();say('ok','Passwort geändert. Beim nächsten Anmelden gilt das neue Passwort.');
+    }finally{btn.disabled=false;btn.textContent='Passwort ändern';}
+  }},
+    h('h2',null,'Dein Konto'),
+    h('div',{class:'eyebrow',style:'overflow-wrap:anywhere'},'Angemeldet als ',h('strong',null,me.email),h('span',{class:'tag'+(owner?' lime':'')},owner?'Inhaber':'Mitglied')),
+    h('input',{type:'email',autocomplete:'username',value:me.email,hidden:true,'aria-hidden':'true',tabindex:'-1'}),
+    h('div',{class:'grid2'},pwField('pc-old','Aktuelles Passwort','current-password'),h('div')),
+    h('div',{class:'grid2'},pwField('pc-new','Neues Passwort','new-password'),pwField('pc-rep','Neues Passwort wiederholen','new-password')),
+    h('div',{class:'eyebrow'},'Mindestens 10 Zeichen.'),
+    msg,
+    h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Passwort ändern')));
+  out.push(form);
+  // Team
+  const team=h('section',{class:'card'},h('h2',null,'Team'),
+    h('p',{style:'margin:0;max-width:70ch'},'Alle im Team sehen dieselben Kunden, Vorlagen und Rechtstexte, können Kundenakten bearbeiten, unterschreiben lassen und PDFs versenden. '+(owner?'Einladen und Entfernen kannst nur du als Inhaber.':'Einladen und Entfernen kann nur das Inhaber-Konto.')));
+  if(!S.team.length)team.append(h('div',{class:'eyebrow'},'Team-Liste wird geladen …'));
+  for(const m of S.team){
+    const row=h('div',{class:'member'},h('div',{class:'who'},m.email,h('span',{class:'tag'+(m.role==='owner'?' lime':'')},m.role==='owner'?'Inhaber':'Mitglied')));
+    if(owner&&m.role!=='owner'){
+      if(S.confirm==='rm:'+m.email){
+        row.append(h('div',{class:'confirm'},'Zugang wirklich entfernen?',
+          h('button',{type:'button',class:'btn danger',onclick:async()=>{try{await callFn('team',{action:'remove',email:m.email});S.confirm=null;await loadTeam();toast('Zugang entfernt');}catch(e){toast(e.message);}render();}},'Entfernen'),
+          h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen')));
+      }else{
+        row.append(h('button',{type:'button',class:'btn',onclick:async e=>{const b=e.currentTarget;b.disabled=true;try{await callFn('team',{action:'invite',email:m.email});toast('Einladung erneut gesendet');}catch(err){toast(err.message);}finally{b.disabled=false;}}},'Link erneut senden'),
+          h('button',{type:'button',class:'btn danger',onclick:()=>{S.confirm='rm:'+m.email;render();}},'Entfernen'));
+      }
+    }
+    team.append(row);
+  }
+  if(owner){
+    const st=h('div',{id:'inv-msg',class:'banner '+(S.invMsg?S.invMsg[0]:'warn'),hidden:!S.invMsg},S.invMsg?S.invMsg[1]:'');
+    const sayI=(cls,t)=>{S.invMsg=[cls,t];const m=document.getElementById('inv-msg')||st;m.className='banner '+cls;m.textContent=t;m.hidden=false;};
+    const inv=h('form',{class:'member',style:'align-items:flex-end',onsubmit:async e=>{
+      e.preventDefault();st.hidden=true;S.invMsg=null;const inp=document.getElementById('inv-mail');const v=inp.value.trim().toLowerCase();
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)){sayI('warn','Bitte eine gültige E-Mail-Adresse eintragen.');return;}
+      const b=inv.querySelector('button');b.disabled=true;b.textContent='Lade ein …';
+      try{await callFn('team',{action:'invite',email:v});inp.value='';await loadTeam().catch(()=>{});S.invMsg=['ok','Einladung an '+v+' gesendet. Die Person legt über den Link ihr eigenes Passwort fest. Der Link gilt nur kurze Zeit; sonst einfach „Link erneut senden“.'];render._force=true;render();return;}
+      catch(err){sayI('warn',err.message);}
+      finally{b.disabled=false;b.textContent='Einladen';}
+    }},h('div',{class:'field',style:'flex:1 1 260px'},h('label',{for:'inv-mail'},'Person einladen (E-Mail)'),h('input',{type:'email',id:'inv-mail',autocomplete:'off',placeholder:'name@beispiel.de'})),h('button',{type:'submit',class:'btn primary'},'Einladen'));
+    team.append(inv,st);
+  }
+  out.push(team);
+  return out;
+}
+function viewNoAccess(){
+  return h('div',{class:'empty'},h('h1',null,'Kein Zugriff'),
+    h('p',{style:'margin:0;max-width:60ch'},'Dieses Konto ist für die App nicht freigeschaltet. Bitte beim Inhaber-Konto eine Einladung anfordern.'),
+    h('button',{type:'button',class:'btn primary',onclick:async()=>{await S.sb.auth.signOut();location.reload();}},'Abmelden'));
+}
+
 /* ---------- render ---------- */
 function render(){
   const a=document.activeElement;
@@ -721,15 +820,18 @@ function render(){
   render._force=false;
   renderSide();
   S.progEls=[];const v=document.getElementById('view');const c=cur();let kids;
-  if(S.view==='vorlagen')kids=viewVorlagen();
+  if(S.blocked)kids=[viewNoAccess()];
+  else if(S.view==='vorlagen')kids=viewVorlagen();
+  else if(S.view==='konto')kids=viewKonto();
   else if(!c)kids=[viewEmpty()];
   else kids=({start:viewStart,fragen:viewFragen,datenschutz:viewDatenschutz,unterschrift:viewUnterschrift,pdf:viewPdf,angebot:viewAngebot}[S.view]||viewStart)(c);
-  const back=(c&&S.view!=='start'&&S.view!=='vorlagen')?h('button',{type:'button',class:'btn mobile-back',onclick:()=>{S.view='start';render();window.scrollTo(0,0);}},'← Übersicht'):null;
+  const back=(c&&!S.blocked&&S.view!=='start'&&!SETTINGS.includes(S.view))?h('button',{type:'button',class:'btn mobile-back',onclick:()=>{S.view='start';render();window.scrollTo(0,0);}},'← Übersicht'):null;
   v.replaceChildren(...[back].concat(kids).filter(Boolean));
 }
 document.addEventListener('focusout',()=>{setTimeout(()=>{const a=document.activeElement;const typing=a&&a.closest&&a.closest('#view')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);if(S.pendingRender&&!typing&&S.view!=='unterschrift'){S.pendingRender=false;render();}},50);});
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button');if(b)render._force=true;setTimeout(()=>render._force=false,0);},true);
 document.getElementById('navTpl').addEventListener('click',()=>{S.view='vorlagen';render();});
+document.getElementById('navKonto').addEventListener('click',()=>{S.view='konto';S.confirm=null;S.pwMsg=null;S.invMsg=null;render();if(S.sb){const before=JSON.stringify(S.team);loadTeam().then(()=>{if(S.view==='konto'&&JSON.stringify(S.team)!==before)render();}).catch(()=>{});}});
 
 render();
 /* ---------- Supabase-Anbindung ---------- */
@@ -776,13 +878,46 @@ const browserDownloads={save:async({filename,data})=>{
 function loginFlow(sb){
   return new Promise(resolve=>{
     const box=document.getElementById('login'),form=document.getElementById('loginForm'),err=document.getElementById('lg-err'),btn=document.getElementById('lg-btn');
-    box.hidden=false;setTimeout(()=>document.getElementById('lg-mail').focus(),50);
+    box.hidden=false;form.hidden=false;document.getElementById('pwForm').hidden=true;setTimeout(()=>document.getElementById('lg-mail').focus(),50);
+    if(loginFlow.notice){err.className='banner warn';err.textContent=loginFlow.notice;err.hidden=false;loginFlow.notice='';}
+    const fg=document.getElementById('lg-forgot');
+    fg.addEventListener('click',async()=>{
+      const mail=document.getElementById('lg-mail').value.trim();
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){err.className='banner warn';err.textContent='Bitte zuerst oben deine E-Mail-Adresse eintragen.';err.hidden=false;return;}
+      fg.disabled=true;
+      try{
+        const r=await fetch('/.netlify/functions/reset-password',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:mail})});
+        const t=await r.json().catch(()=>({}));
+        if(!r.ok)throw new Error(t.error||('Fehler '+r.status));
+        err.className='banner info';err.textContent='Wenn die Adresse zum Team gehört, kommt gleich eine E-Mail mit einem Link zum Neusetzen. Bitte auch im Spam-Ordner nachsehen.';err.hidden=false;
+      }catch(x){err.className='banner warn';err.textContent='Das hat nicht geklappt: '+x.message;err.hidden=false;}
+      finally{fg.disabled=false;}
+    });
     form.addEventListener('submit',async e=>{
-      e.preventDefault();err.hidden=true;btn.disabled=true;btn.textContent='Anmelden …';
+      e.preventDefault();err.hidden=true;err.className='banner warn';btn.disabled=true;btn.textContent='Anmelden …';
       const {data,error}=await sb.auth.signInWithPassword({email:document.getElementById('lg-mail').value.trim(),password:document.getElementById('lg-pw').value});
       btn.disabled=false;btn.textContent='Anmelden';
       if(error){err.textContent='Anmeldung fehlgeschlagen. E-Mail und Passwort prüfen.';err.hidden=false;return;}
       box.hidden=true;resolve(data.session);
+    });
+  });
+}
+function setPasswordFlow(sb,session,kind){
+  return new Promise(resolve=>{
+    const box=document.getElementById('login'),lf=document.getElementById('loginForm'),form=document.getElementById('pwForm'),err=document.getElementById('pw-err'),btn=document.getElementById('pw-btn');
+    box.hidden=false;lf.hidden=true;form.hidden=false;
+    document.getElementById('pw-title').textContent=kind==='invite'?'Willkommen! Passwort festlegen':'Neues Passwort festlegen';
+    document.getElementById('pw-who').textContent=(session.user&&session.user.email)||'';
+    setTimeout(()=>document.getElementById('pw-new').focus(),50);
+    form.addEventListener('submit',async e=>{
+      e.preventDefault();err.hidden=true;
+      const a=document.getElementById('pw-new').value,b=document.getElementById('pw-rep').value;
+      const p=pwProblem(a,b);if(p){err.textContent=p;err.hidden=false;return;}
+      btn.disabled=true;btn.textContent='Speichere …';
+      const {error}=await sb.auth.updateUser({password:a});
+      btn.disabled=false;btn.textContent='Speichern und weiter';
+      if(error){err.textContent=pwErrorText(error);err.hidden=false;return;}
+      box.hidden=true;form.hidden=true;lf.hidden=false;toast('Passwort gespeichert');resolve();
     });
   });
 }
@@ -794,13 +929,25 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.s
 (async function boot(){
   const cfg=window.ONLION_CONFIG||{};
   if(!window.supabase||!cfg.supabaseUrl||/DEIN-PROJEKT/.test(cfg.supabaseUrl)){S.loaded=true;render();showSetup();return;}
+  // Links aus Einladungs- und Passwort-E-Mails kommen mit #access_token=…&type=invite|recovery an
+  const hp=new URLSearchParams(location.hash.replace(/^#/,''));
+  const linkType=hp.get('type'),linkErr=hp.get('error_description')||hp.get('error');
   const sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
   document.getElementById('logoutBtn').addEventListener('click',async()=>{await sb.auth.signOut();location.reload();});
-  const {data:{session}}=await sb.auth.getSession();
-  if(!session)await loginFlow(sb);
+  let {data:{session}}=await sb.auth.getSession();
+  if(location.hash)history.replaceState(null,'',location.pathname+location.search);
+  if(linkErr&&!session)loginFlow.notice='Der Link ist abgelaufen oder wurde schon benutzt. Bitte E-Mail eintragen und „Passwort vergessen?“ wählen.';
+  if(!session)session=await loginFlow(sb);
+  else if(linkType==='invite'||linkType==='recovery')await setPasswordFlow(sb,session,linkType);
+  S.sb=sb;
+  const myMail=String(session&&session.user&&session.user.email||'').toLowerCase();
+  try{await loadTeam();}catch(e){S.team=[];}
+  const meRow=S.team.find(m=>String(m.email).toLowerCase()===myMail);
+  S.me={email:myMail,role:meRow?meRow.role:'member'};
+  if(!meRow){S.blocked=true;S.loaded=true;render();return;}
   sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT')location.reload();});
   const db=makeDb(sb);
-  S.db=db;S.dl=browserDownloads;S.sb=sb;
+  S.db=db;S.dl=browserDownloads;
   db.collection('customers').orderBy('createdAt','desc').onSnapshot(snap=>{
     S.customers=snap.docs.map(d=>Object.assign({id:d.id},d.data()));S.loaded=true;
     if(!S.curId&&S.customers.length)S.curId=S.customers[0].id;
