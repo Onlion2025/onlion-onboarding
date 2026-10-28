@@ -262,7 +262,8 @@ function stageState(c,id){
 }
 function fmtDate(iso){try{return new Date(iso).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'});}catch(e){return iso;}}
 function fill(text,c){
-  const l=c.legal||{}, today=new Date().toLocaleDateString('de-DE');
+  let l=c.legal||{}; const today=new Date().toLocaleDateString('de-DE');
+  const T=v=>String(v||'').replace(/\s+/g,' ').trim();c=Object.assign({},c,{firma:T(c.firma),adresse:T(c.adresse),ansprechpartner:T(c.ansprechpartner)});l=Object.assign({},l,{dsb:T(l.dsb),speicherung:T(l.speicherung)});
   const map={firma:c.firma||'[Firma]',adresse:c.adresse||'[Adresse]',vertreter:c.ansprechpartner||'[Ansprechpartner]',dsb:l.dsb||'[Datenschutzbeauftragter]',speicherung:l.speicherung||'[Speicherung]',datum:today};
   return String(text||'').replace(/\{\{\s*(\w+)\s*\}\}/g,(m,k)=>k in map?map[k]:m);
 }
@@ -343,7 +344,7 @@ function viewStart(c){
     stages.append(h('li',null,h('button',{type:'button',class:'stage '+state,disabled:state==='locked',onclick:()=>{S.view=st.id;render();}},h('span',{class:'k'},k),h('span',{class:'t'},st.t),h('span',{class:'d'},d))));
   });
   const ro=signed(c);
-  const f=(id,label,key,type)=>h('div',{class:'field'},h('label',{for:id},label),h('input',{type:type||'text',id,value:c[key]||'',disabled:ro,oninput:e=>{const p={};p[key]=e.target.value;saveCust(c.id,p);}}));
+  const f=(id,label,key,type)=>h('div',{class:'field'},h('label',{for:id},label),h('input',{type:type||'text',id,value:c[key]||'',disabled:ro,oninput:e=>{const p={};p[key]=e.target.value;saveCust(c.id,p);},onchange:e=>{const v=e.target.value.replace(/\s+/g,' ').trim();if(v!==e.target.value){e.target.value=v;const p={};p[key]=v;saveCust(c.id,p);}}}));
   const stamm=h('section',{class:'card','aria-label':'Stammdaten'},h('h2',null,'Stammdaten'),
     h('div',{class:'grid2'},f('s-firma','Firma','firma'),f('s-ap','Ansprechpartner','ansprechpartner'),f('s-mail','E-Mail','email','email'),f('s-tel','Telefon','telefon','tel'),f('s-adr','Adresse','adresse')));
   const del=S.confirm==='del'+c.id
@@ -487,7 +488,7 @@ async function buildPdf(c){
   const para=(t,size,style,gap)=>{size=size||10;doc.setFont('helvetica',style||'normal');doc.setFontSize(size);const lines=doc.splitTextToSize(clean(t),CW);for(const ln of lines){need(size*0.45);doc.setFont('helvetica',style||'normal');doc.setFontSize(size);doc.setTextColor(28);doc.text(ln,M,y);y+=size*0.45;}y+=gap==null?2:gap;};
   head();
   para(c.firma||'Ohne Namen',18,'bold',1);
-  para([c.adresse,c.ansprechpartner,c.email,c.telefon].filter(Boolean).join(' · '),10,'normal',4);
+  para([c.adresse,c.ansprechpartner,c.email,c.telefon].map(v=>String(v||'').replace(/\s+/g,' ').trim()).filter(Boolean).join(' · '),10,'normal',4);
   para('Fragenkatalog',13,'bold',2);
   for(const s of (S.tpl?S.tpl.sections:[])){
     para(s.title,11,'bold',1);
