@@ -64,6 +64,9 @@ exports.handler = async (event) => {
     const row = await teamRow(email);
     if (!row) return json(404, { error: 'Diese Person steht nicht im Team.' });
     if (row.role === 'owner') return json(400, { error: 'Das Inhaber-Konto kann nicht entfernt werden.' });
+    const kids = await admin('/rest/v1/team?select=email&sponsor=eq.' + encodeURIComponent(email));
+    const kl = kids.ok ? await kids.json().catch(() => []) : [];
+    if (Array.isArray(kl) && kl.length) return json(400, { error: 'Diese Person hat noch Partner in ihrer Struktur. Bitte zuerst unter Vertrieb einem anderen Werber zuordnen.' });
     const del = await admin('/rest/v1/team?email=eq.' + encodeURIComponent(email), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     if (!del.ok) return json(502, { error: 'Entfernen fehlgeschlagen.' });
     // Login-Konto ebenfalls löschen, damit keine Anmeldung mehr möglich ist

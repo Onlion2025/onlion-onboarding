@@ -12,6 +12,8 @@ global.fetch = async (url, opts = {}) => {
   if (url.includes('/rest/v1/team')) {
     const m = /email=eq\.([^&]+)/.exec(url); const em = m ? decodeURIComponent(m[1]) : null;
     if (opts.headers.Authorization !== 'Bearer srk') return R(401, {});
+    const sm = /sponsor=eq\.([^&]+)/.exec(url);
+    if (!opts.method && sm) return R(200, team.filter(t => t.sponsor === decodeURIComponent(sm[1])));
     if (!opts.method) return R(200, team.filter(t => t.email === em));
     if (opts.method === 'POST') { team.push(Object.assign({ user_id: null }, JSON.parse(opts.body))); return R(201, {}); }
     if (opts.method === 'PATCH') { const t = team.find(t => t.email === em); Object.assign(t, JSON.parse(opts.body)); return R(204, {}); }
@@ -95,6 +97,7 @@ let pass = 0; const ok = (n, c) => { assert.ok(c, n); pass++; console.log('OK   
   ok('Partner mit Werber einladen', r.statusCode === 200 && team.some(t => t.email === 'vp2@x.de' && t.role === 'partner' && t.sponsor === 'vp1@x.de' && t.name === 'Vera'));
   ok('Partner-Einladung mit Partner-Text', JSON.parse(calls.find(c => c.url.includes('brevo')).opts.body).htmlContent.includes('Vertriebspartner'));
   r = await teamFn(ev({ action: 'invite', email: 'vp3@x.de', role: 'partner', sponsor: 'partner@x.de' })); ok('Werber muss Partner sein', r.statusCode === 400);
+  r = await teamFn(ev({ action: 'remove', email: 'vp1@x.de' })); ok('Werber mit Struktur nicht entfernbar', r.statusCode === 400 && JSON.parse(r.body).error.includes('Struktur'));
   r = await teamFn(ev({ action: 'invite', email: 'admin2@x.de', role: 'owner' })); ok('Rolle owner nicht vergebbar', r.statusCode === 200 && team.find(t => t.email === 'admin2@x.de').role === 'member');
 
   console.log('\n' + pass + ' Funktionstests bestanden');
