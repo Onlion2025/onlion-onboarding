@@ -67,7 +67,7 @@ h2{margin:0;font-size:20px;font-weight:700;text-wrap:balance}
 .field label{font-size:13px;font-weight:600}
 .login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px;z-index:30}
 .login-card{width:min(420px,100%)}
-input[type=text],input[type=email],input[type=tel],input[type=password],input[type=number],textarea,select{background:var(--field);border:1px solid var(--line-strong);border-radius:10px;padding:11px 12px;min-height:44px;width:100%}
+input[type=text],input[type=email],input[type=tel],input[type=password],input[type=number],input[type=date],input[type=datetime-local],textarea,select{background:var(--field);border:1px solid var(--line-strong);border-radius:10px;padding:11px 12px;min-height:44px;width:100%}
 textarea{min-height:76px;resize:vertical}
 input:disabled,textarea:disabled,select:disabled{opacity:.6}
 .check{display:flex;gap:10px;align-items:flex-start;min-height:44px;padding-block:6px}
@@ -129,6 +129,45 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
 .toast{position:fixed;left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);top:calc(16px + env(safe-area-inset-top,0px));background:var(--lime);color:var(--lime-ink);padding:12px 16px;border-radius:12px;font-weight:600;z-index:20}
 .tpl-q{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;word-break:break-all;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:600px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpis .kpi:first-child{grid-column:1/-1}}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:6px;min-height:118px;min-width:0}
+.kpi .kn{font-size:clamp(20px,2.2vw,28px);font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.15;white-space:nowrap}
+.kpi .kl{font-size:13px;color:var(--muted);font-weight:600}
+.kpi .ks{font-size:12px;color:var(--muted)}
+.kpi.hl{background:var(--lime);border-color:var(--lime);color:var(--lime-ink)}.kpi.hl .kl,.kpi.hl .ks{color:var(--lime-ink)}
+.pipe{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.pst{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:14px;min-height:104px;display:flex;flex-direction:column;gap:6px;text-align:left;cursor:pointer;color:var(--fg);min-width:0}
+.pst:hover{border-color:var(--line-strong)}.pst.on{box-shadow:inset 0 0 0 2px var(--accent-ink);border-color:var(--accent-ink)}
+.pst .pn{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.pst .pl{font-size:13px;font-weight:600;line-height:1.3}
+@media (max-width:1000px){.pipe{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:480px){.pipe{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.sdot{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;border:2px solid transparent}
+.st-neu{background:#ffffff;border-color:#9a9a90}.st-angerufen{background:#d9d9d0;border-color:#9a9a90}.st-termin{background:#eaffa3;border-color:#7f9a1f}.st-unterschrieben{background:#c8ff00;border-color:#4a6600}.st-abgeschlossen{background:#4a6600;border-color:#4a6600}.st-verloren{background:#f6c9c2;border-color:#b42318}
+.slab{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap}
+.funnel{display:flex;flex-direction:column;gap:10px}
+.frow{display:grid;grid-template-columns:minmax(120px,170px) minmax(0,1fr) 92px;gap:12px;align-items:center;font-size:14px}
+.frow .fb{height:22px;background:var(--panel2);border-radius:6px;overflow:hidden}.frow .fb>div{height:100%;background:var(--lime);border-radius:6px;min-width:2px}
+.frow .fv{font-variant-numeric:tabular-nums;text-align:right;color:var(--muted)}
+@media (max-width:520px){.frow{grid-template-columns:minmax(0,1fr) 80px}.frow .fb{grid-column:1/-1;grid-row:2}}
+.dlist{display:flex;flex-direction:column}
+.ditem{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding:10px 0;min-height:44px;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer;color:var(--fg);width:100%}
+.ditem:hover{background:var(--panel2)}
+.ditem .dn{flex:1 1 180px;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.ditem .dd{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ditem .dd.late{color:#b42318;font-weight:600}
+.cols2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
+.ctable{width:100%;border-collapse:collapse;font-size:14px}
+.ctable th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line-strong)}
+.ctable td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.ctable tr.clk{cursor:pointer}.ctable tr.clk:hover td{background:var(--panel2)}
+.ctable .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+@media (max-width:760px){.ctable thead{display:none}.ctable tr{display:grid;grid-template-columns:minmax(0,1fr) auto;border-bottom:1px solid var(--line);padding:8px 0}.ctable td{border:0;padding:3px 4px}.ctable td.hide-m{display:none}}
+.log{display:flex;flex-direction:column;gap:8px}
+.logi{border-left:3px solid var(--lime);padding:4px 0 4px 12px;font-size:14px}
+.logi .lm{font-size:12px;color:var(--muted)}
 .linkbtn{background:none;border:0;padding:8px 0;min-height:44px;color:var(--accent-ink);font-weight:600;cursor:pointer;text-align:left;align-self:flex-start;text-decoration:underline;text-underline-offset:3px}
 .member{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:12px}
 .member .who{flex:1 1 220px;min-width:0;overflow-wrap:anywhere}
@@ -182,6 +221,10 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
 <div class="app">
   <nav class="side" aria-label="Navigation">
     <div class="brand"><img src="logo-black.png" alt="ONLION"><div class="prod" id="prodName">KI-Telefon-Agent</div></div>
+    <div class="group settings" id="dashGroup">
+      <div class="label">Überblick</div>
+      <button class="navbtn" id="navDash" type="button">Dashboard</button>
+    </div>
     <div class="group" id="custGroup">
       <div class="label">Kunden</div>
       <div id="custList"></div>
@@ -216,7 +259,17 @@ const STAGES=[
   {id:'angebot',t:'Angebot'}
 ];
 const STORAGE_OPTS=['Nur als Text, 90 Tage','Audio und Text, 30 Tage','Nicht speichern'];
-const SETTINGS=['vorlagen','konto'];
+const SETTINGS=['vorlagen','konto','dashboard'];
+const CRM=[
+  {id:'neu',t:'Neu'},
+  {id:'angerufen',t:'Angerufen'},
+  {id:'termin',t:'Termin vereinbart'},
+  {id:'unterschrieben',t:'Unterschrieben'},
+  {id:'abgeschlossen',t:'Abgeschlossen'},
+  {id:'verloren',t:'Verloren'}
+];
+const CRM_RANK={neu:0,angerufen:1,termin:2,unterschrieben:3,abgeschlossen:4};
+const QUELLEN=['Empfehlung','Event','Kaltakquise','Website','Social Media','Bestandskunde','Sonstiges'];
 const S={me:null,team:[],blocked:false,db:null,dl:null,customers:[],tpl:null,legal:null,curId:null,view:'start',section:0,newOpen:false,loaded:false,pendingRender:false,confirm:null,pads:{}};
 
 function h(tag,attrs,...kids){
@@ -240,6 +293,18 @@ function allQs(){return S.tpl?S.tpl.sections.flatMap(s=>s.questions):[];}
 function answeredCount(c){const a=c.answers||{};return allQs().filter(q=>(a[q.id]||'').trim()).length;}
 function legalOk(c){const l=c.legal||{};return !!(l.dsb&&l.speicherung&&l.hinweis&&l.agb);}
 function signed(c){return !!(c&&c.signature&&c.signature.hash);}
+/* CRM: gespeicherter Status; „Unterschrieben“ ergibt sich automatisch aus der Unterschrift */
+function crmOf(c){return (c&&c.crm)||{};}
+function stat(c){const b=crmOf(c).status||'neu';if(signed(c)&&b!=='verloren'&&(CRM_RANK[b]||0)<CRM_RANK.unterschrieben)return 'unterschrieben';return b;}
+function statT(id){const x=CRM.find(s=>s.id===id);return x?x.t:id;}
+function statEl(id){return h('span',{class:'slab'},h('span',{class:'sdot st-'+id,'aria-hidden':'true'}),statT(id));}
+function reached(c){let r=CRM_RANK[stat(c)]||0;for(const e of (crmOf(c).history||[]))r=Math.max(r,CRM_RANK[e.s]||0);if(signed(c)||(c.history||[]).length)r=Math.max(r,CRM_RANK.unterschrieben);return r;}
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function fmtDay(s){if(!s)return '';try{const d=new Date(s.length<=10?s+'T12:00':s);return d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})+(s.length>10?', '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'');}catch(e){return s;}}
+function crmPatch(c,status){
+  const cr=crmOf(c);const hist=(cr.history||[]).concat([{s:status,at:new Date().toISOString(),by:(S.me&&S.me.email)||''}]);
+  return {crm:{status,history:hist}};
+}
 const STAMM=[['firma','Firma'],['ansprechpartner','Ansprechpartner'],['email','E-Mail'],['telefon','Telefon'],['adresse','Adresse']];
 const LEGAL_REQ=['dsb','speicherung','hinweis','agb'];
 function progress(c){
@@ -302,7 +367,7 @@ function flushAll(){const ps=[];for(const k in timers){clearTimeout(timers[k].t)
 async function createCustomer(data){
   const now=new Date().toISOString();
   const ref=S.db.collection('customers').doc();
-  await ref.set(Object.assign({product:'KI-Telefon-Agent',templateId:TPL_ID,answers:{},legal:{},createdAt:now,updatedAt:now},data));
+  await ref.set(Object.assign({product:'KI-Telefon-Agent',templateId:TPL_ID,answers:{},legal:{},crm:{status:'neu',history:[{s:'neu',at:now,by:(S.me&&S.me.email)||''}]},createdAt:now,updatedAt:now},data));
   S.curId=ref.id;S.view='start';S.newOpen=false;render();
 }
 
@@ -311,7 +376,7 @@ function renderSide(){
   const list=document.getElementById('custList');list.replaceChildren();
   if(!S.loaded)list.append(h('div',{class:'eyebrow',text:'Lade Kunden …'}));
   for(const c of S.customers){
-    list.append(h('button',{type:'button',class:'navbtn'+(c.id===S.curId&&!SETTINGS.includes(S.view)?' on':''),onclick:()=>{S.curId=c.id;S.view='start';render();}},c.firma||'Ohne Namen',h('small',null,signed(c)?'unterschrieben':(progress(c).pct+' % erfasst'))));
+    list.append(h('button',{type:'button',class:'navbtn'+(c.id===S.curId&&!SETTINGS.includes(S.view)?' on':''),onclick:()=>{S.curId=c.id;S.view='start';render();}},c.firma||'Ohne Namen',h('small',null,statT(stat(c))+(stat(c)==='neu'||stat(c)==='angerufen'||stat(c)==='termin'?' · '+progress(c).pct+' % erfasst':''))));
   }
   const nb=document.getElementById('newCustBox');nb.replaceChildren();
   if(!S.db){nb.append(h('div',{class:'eyebrow',text:'Speichern ist in dieser Ansicht nicht verfügbar.'}));}
@@ -333,6 +398,7 @@ function renderSide(){
   }
   document.getElementById('navTpl').className='navbtn'+(S.view==='vorlagen'?' on':'');
   document.getElementById('navKonto').className='navbtn'+(S.view==='konto'?' on':'');
+  document.getElementById('navDash').className='navbtn'+(S.view==='dashboard'?' on':'');document.getElementById('dashGroup').hidden=S.blocked;
   document.getElementById('custGroup').hidden=S.blocked;
   document.getElementById('navTpl').hidden=S.blocked;document.getElementById('navKonto').hidden=S.blocked;
 }
@@ -375,7 +441,7 @@ function viewStart(c){
   return [
     h('div',{class:'row',style:'align-items:flex-end'},h('div',null,h('div',{class:'eyebrow'},'KI-Telefon-Agent'),h('h1',null,c.firma||'Ohne Namen')),h('div',{class:'spacer'}),
       next?h('button',{type:'button',class:'btn primary',onclick:()=>{S.view=next.id;render();}},'Weiter: '+next.t):null),
-    progressEl(c,false),stages,stamm,h('div',{class:'row'},del)];
+    crmCard(c),progressEl(c,false),stages,stamm,h('div',{class:'row'},del)];
 }
 
 function viewFragen(c){
@@ -482,7 +548,8 @@ function viewUnterschrift(c){
     const fresh=cur()||c;
     const signedAt=new Date().toISOString();
     const hash=await sha256(canonical(fresh,{signedAt,ort,kunde:name}));
-    try{await S.db.doc('customers/'+c.id).update({signature:{kunde,onlion,ort,signedAt,hash,version:(c.history||[]).length+1}});toast('Unterschrieben');}
+    const up={signature:{kunde,onlion,ort,signedAt,hash,version:(c.history||[]).length+1}};const cs=crmOf(fresh).status||'neu';if(cs!=='verloren'&&(CRM_RANK[cs]||0)<CRM_RANK.unterschrieben)Object.assign(up,crmPatch(fresh,'unterschrieben'));
+    try{await S.db.doc('customers/'+c.id).update(up);toast('Unterschrieben');}
     catch(err){toast('Nicht gespeichert: '+(err&&err.message||err));e.target.disabled=false;}
   }},'Verbindlich unterschreiben');
   return [h('div',null,h('div',{class:'eyebrow'},c.firma),h('h1',null,'Unterschrift')),
@@ -735,6 +802,106 @@ function viewVorlagen(){
   return out;
 }
 
+/* ---------- CRM ---------- */
+function crmCard(c){
+  const cr=crmOf(c),cs=stat(c);
+  const chips=h('div',{class:'chips',role:'group','aria-label':'Status'});
+  for(const st of CRM){
+    const auto=st.id==='unterschrieben'&&signed(c)&&cs==='unterschrieben'&&(CRM_RANK[cr.status||'neu']||0)<CRM_RANK.unterschrieben;
+    chips.append(h('button',{type:'button',class:'chip'+(cs===st.id?' on':''),'aria-pressed':cs===st.id?'true':'false',onclick:()=>{
+      if(cs===st.id&&!auto)return;
+      if(st.id==='unterschrieben'&&!signed(c)){toast('„Unterschrieben“ setzt die App automatisch nach der Unterschrift.');return;}
+      if(signed(c)&&(CRM_RANK[st.id]||0)<CRM_RANK.unterschrieben&&st.id!=='verloren'){toast('Die Akte ist unterschrieben. Für einen früheren Status zuerst eine neue Version starten.');return;}
+      saveCust(c.id,crmPatch(c,st.id),0);toast('Status: '+st.t);render._force=true;render();
+    }},h('span',{class:'slab'},h('span',{class:'sdot st-'+st.id,'aria-hidden':'true'}),st.t)));
+  }
+  const fld=(id,label,el)=>h('div',{class:'field'},h('label',{for:id},label),el);
+  const termin=h('input',{type:'datetime-local',id:'cr-termin',value:cr.termin||'',onchange:e=>{const v=e.target.value;const p={crm:{termin:v}};if(v&&(CRM_RANK[cs]||0)<CRM_RANK.termin&&cs!=='verloren')Object.assign(p.crm,crmPatch(c,'termin').crm);saveCust(c.id,p,0);if(p.crm.status){toast('Status: Termin vereinbart');render._force=true;render();}}});
+  const wv=h('input',{type:'date',id:'cr-wv',value:cr.wv||'',onchange:e=>saveCust(c.id,{crm:{wv:e.target.value}},0)});
+  const qsel=h('select',{id:'cr-quelle',onchange:e=>saveCust(c.id,{crm:{quelle:e.target.value}},0)},h('option',{value:''},'Bitte wählen'),...QUELLEN.map(q=>{const o=h('option',{value:q},q);if(cr.quelle===q)o.selected=true;return o;}));
+  // Protokoll
+  const types=['Anruf','Termin','E-Mail','Notiz'];S.logType=S.logType||'Anruf';
+  const tchips=h('div',{class:'chips',role:'group','aria-label':'Art des Eintrags'},...types.map(t=>h('button',{type:'button',class:'chip'+(S.logType===t?' on':''),onclick:e=>{S.logType=t;for(const b of tchips.children)b.classList.toggle('on',b.textContent===t);}},t)));
+  const ta=h('textarea',{id:'cr-log','aria-label':'Eintrag',placeholder:'Was wurde besprochen? Nächster Schritt?',style:'min-height:70px'});
+  const addLog=h('button',{type:'button',class:'btn primary',onclick:()=>{
+    const text=ta.value.trim();if(!text){toast('Bitte zuerst etwas eintragen.');return;}
+    const entry={at:new Date().toISOString(),by:(S.me&&S.me.email)||'',type:S.logType,text};
+    const p={crm:{log:[entry].concat(cr.log||[])}};
+    if(S.logType==='Anruf'&&cs==='neu')Object.assign(p.crm,crmPatch(c,'angerufen').crm);
+    saveCust(c.id,p,0);ta.value='';toast(p.crm.status?'Gespeichert · Status: Angerufen':'Eintrag gespeichert');render._force=true;render();
+  }},'Eintrag speichern');
+  const log=h('div',{class:'log'});
+  for(const e of (cr.log||[]).slice(0,S.logAll===c.id?999:5))log.append(h('div',{class:'logi'},h('div',{class:'lm'},fmtDate(e.at)+' · '+e.type),h('div',{style:'white-space:pre-wrap;overflow-wrap:anywhere'},e.text)));
+  if((cr.log||[]).length>5&&S.logAll!==c.id)log.append(h('button',{type:'button',class:'linkbtn',onclick:()=>{S.logAll=c.id;render._force=true;render();}},'Alle '+cr.log.length+' Einträge zeigen'));
+  const hist=(cr.history||[]).slice(-1)[0];
+  return h('section',{class:'card','aria-label':'Vertrieb'},
+    h('div',{class:'row'},h('h2',null,'Vertrieb'),h('div',{class:'spacer'}),hist?h('div',{class:'eyebrow'},'Status seit '+fmtDate(hist.at)):null),
+    chips,
+    h('div',{class:'grid2'},fld('cr-termin','Termin',termin),fld('cr-wv','Wiedervorlage (nächster Kontakt)',wv),fld('cr-quelle','Quelle',qsel)),
+    h('div',{class:'field'},h('label',{for:'cr-log'},'Gesprächsprotokoll'),tchips,ta),
+    h('div',{class:'row'},addLog,h('div',{class:'eyebrow'},'Ein „Anruf“ bei einem neuen Kunden setzt den Status auf „Angerufen“, ein Termin-Datum auf „Termin vereinbart“.')),
+    (cr.log||[]).length?log:null);
+}
+const eur0=n=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n||0);
+function offerNet(c){return offerTotals((c.offer&&c.offer.items)||[]).net;}
+function viewDashboard(){
+  const cs=S.customers,n=cs.length,today=todayStr(),month=today.slice(0,7);
+  const by={};for(const st of CRM)by[st.id]=[];for(const c of cs)(by[stat(c)]||by.neu).push(c);
+  const won=by.abgeschlossen,lost=by.verloren;
+  const openStates=['neu','angerufen','termin','unterschrieben'];
+  const openVal=cs.filter(c=>openStates.includes(stat(c))).reduce((s,c)=>s+offerNet(c),0);
+  const wonVal=won.reduce((s,c)=>s+offerNet(c),0);
+  const newM=cs.filter(c=>String(c.createdAt||'').slice(0,7)===month).length;
+  const decided=won.length+lost.length;
+  const kpi=(l,v,sub,hl)=>h('div',{class:'kpi'+(hl?' hl':'')},h('div',{class:'kl'},l),h('div',{class:'kn'},v),sub?h('div',{class:'ks'},sub):null);
+  const kpis=h('div',{class:'kpis'},
+    kpi('Kunden gesamt',String(n),newM+' neu in diesem Monat'),
+    kpi('Abgeschlossen',String(won.length),n?Math.round(won.length/n*100)+' % aller Kunden':'noch keine Kunden',true),
+    kpi('Abschlussquote',decided?Math.round(won.length/decided*100)+' %':'–',decided?'von '+decided+' entschiedenen':'noch nichts entschieden'),
+    kpi('Angebote offen',eur0(openVal),'netto, laufende Kunden'),
+    kpi('Umsatz abgeschlossen',eur0(wonVal),'netto, laut Angebot'));
+  // Pipeline-Kacheln mit Filter
+  const f=S.dashFilter||'';
+  const pipe=h('div',{class:'pipe'});
+  for(const st of CRM)pipe.append(h('button',{type:'button',class:'pst'+(f===st.id?' on':''),'aria-pressed':f===st.id?'true':'false',onclick:()=>{S.dashFilter=f===st.id?'':st.id;render();}},h('span',{class:'slab'},h('span',{class:'sdot st-'+st.id,'aria-hidden':'true'}),''),h('span',{class:'pn'},String(by[st.id].length)),h('span',{class:'pl'},st.t)));
+  // Trichter: wie viele haben die Stufe mindestens erreicht
+  const fun=h('div',{class:'funnel'});
+  [['Kunden',0],['Angerufen',1],['Termin vereinbart',2],['Unterschrieben',3],['Abgeschlossen',4]].forEach(([l,r])=>{
+    const k=r===4?won.length:cs.filter(c=>reached(c)>=r).length;const pct=n?Math.round(k/n*100):0;
+    fun.append(h('div',{class:'frow'},h('div',null,l),h('div',{class:'fb',role:'img','aria-label':l+': '+k+' von '+n},h('div',{style:'width:'+pct+'%'})),h('div',{class:'fv'},k+' · '+pct+' %')));
+  });
+  const open=c=>{S.curId=c.id;S.view='start';render();window.scrollTo(0,0);};
+  // Termine und Wiedervorlagen
+  const terms=cs.filter(c=>crmOf(c).termin&&crmOf(c).termin.slice(0,10)>=today&&!['abgeschlossen','verloren'].includes(stat(c))).sort((a,b)=>crmOf(a).termin<crmOf(b).termin?-1:1);
+  const wvs=cs.filter(c=>crmOf(c).wv&&!['abgeschlossen','verloren'].includes(stat(c))).sort((a,b)=>crmOf(a).wv<crmOf(b).wv?-1:1);
+  const tl=h('div',{class:'dlist'});
+  if(!terms.length)tl.append(h('div',{class:'eyebrow'},'Keine anstehenden Termine.'));
+  for(const c of terms.slice(0,8))tl.append(h('button',{type:'button',class:'ditem',onclick:()=>open(c)},h('span',{class:'dn'},c.firma||'Ohne Namen'),h('span',{class:'dd'},fmtDay(crmOf(c).termin))));
+  const wl=h('div',{class:'dlist'});
+  if(!wvs.length)wl.append(h('div',{class:'eyebrow'},'Keine Wiedervorlagen eingetragen.'));
+  for(const c of wvs.slice(0,8)){const late=crmOf(c).wv<today,due=crmOf(c).wv===today;wl.append(h('button',{type:'button',class:'ditem',onclick:()=>open(c)},h('span',{class:'dn'},c.firma||'Ohne Namen'),h('span',{class:'dd'+(late?' late':'')},(late?'Überfällig · ':due?'Heute · ':'')+fmtDay(crmOf(c).wv))));}
+  // Kundenliste
+  const list=(f?by[f]:cs.slice()).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+  const tb=h('tbody');
+  for(const c of list){
+    const last=(crmOf(c).log||[])[0];
+    tb.append(h('tr',{class:'clk',tabindex:'0',onclick:()=>open(c),onkeydown:e=>{if(e.key==='Enter')open(c);}},
+      h('td',null,h('strong',null,c.firma||'Ohne Namen')),h('td',null,statEl(stat(c))),
+      h('td',{class:'hide-m'},crmOf(c).termin?fmtDay(crmOf(c).termin):'–'),
+      h('td',{class:'hide-m'},last?fmtDate(last.at)+' · '+last.type:'–'),
+      h('td',{class:'num'+(offerNet(c)?'':' hide-m')},offerNet(c)?eur(offerNet(c)):'–')));
+  }
+  const table=list.length?h('table',{class:'ctable'},h('thead',null,h('tr',null,h('th',null,'Kunde'),h('th',null,'Status'),h('th',null,'Termin'),h('th',null,'Letzter Kontakt'),h('th',{class:'num'},'Angebot netto'))),tb):h('div',{class:'eyebrow'},f?'Keine Kunden mit Status „'+statT(f)+'“.':'Noch keine Kunden angelegt.');
+  return [
+    h('div',null,h('div',{class:'eyebrow'},'Überblick'),h('h1',null,'Dashboard')),
+    kpis,
+    h('section',{class:'card'},h('h2',null,'Status der Kunden'),pipe),
+    h('section',{class:'card'},h('h2',null,'Vom Kontakt zum Abschluss'),fun),
+    h('div',{class:'cols2'},h('section',{class:'card'},h('h2',null,'Nächste Termine'),tl),h('section',{class:'card'},h('h2',null,'Wiedervorlagen'),wl)),
+    h('section',{class:'card'},h('div',{class:'row'},h('h2',null,f?'Kunden: '+statT(f):'Alle Kunden'),h('div',{class:'spacer'}),f?h('button',{type:'button',class:'btn',onclick:()=>{S.dashFilter='';render();}},'Filter aufheben'):null),table)
+  ];
+}
+
 /* ---------- Konto & Team ---------- */
 async function loadTeam(){
   const {data,error}=await S.sb.from('team').select('email,role,added_at');
@@ -824,6 +991,7 @@ function render(){
   if(S.blocked)kids=[viewNoAccess()];
   else if(S.view==='vorlagen')kids=viewVorlagen();
   else if(S.view==='konto')kids=viewKonto();
+  else if(S.view==='dashboard')kids=viewDashboard();
   else if(!c)kids=[viewEmpty()];
   else kids=({start:viewStart,fragen:viewFragen,datenschutz:viewDatenschutz,unterschrift:viewUnterschrift,pdf:viewPdf,angebot:viewAngebot}[S.view]||viewStart)(c);
   const back=(c&&!S.blocked&&S.view!=='start'&&!SETTINGS.includes(S.view))?h('button',{type:'button',class:'btn mobile-back',onclick:()=>{S.view='start';render();window.scrollTo(0,0);}},'← Übersicht'):null;
@@ -832,6 +1000,7 @@ function render(){
 document.addEventListener('focusout',()=>{setTimeout(()=>{const a=document.activeElement;const typing=a&&a.closest&&a.closest('#view')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);if(S.pendingRender&&!typing&&S.view!=='unterschrift'){S.pendingRender=false;render();}},50);});
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button');if(b)render._force=true;setTimeout(()=>render._force=false,0);},true);
 document.getElementById('navTpl').addEventListener('click',()=>{S.view='vorlagen';render();});
+document.getElementById('navDash').addEventListener('click',()=>{S.view='dashboard';render();window.scrollTo(0,0);});
 document.getElementById('navKonto').addEventListener('click',()=>{S.view='konto';S.confirm=null;S.pwMsg=null;S.invMsg=null;render();if(S.sb){const before=JSON.stringify(S.team);loadTeam().then(()=>{if(S.view==='konto'&&JSON.stringify(S.team)!==before)render();}).catch(()=>{});}});
 
 render();

@@ -91,6 +91,8 @@ Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist.
 - **Angebot:** Positionen aus Bausteinen wählen (Potenzialanalyse, Pilot, Betrieb) oder frei anlegen, Preise anpassen, Summen mit 19 % USt sehen. Das verbindliche Angebot und die Rechnung erstellst du in deinem Buchhaltungsprogramm.
 - **Gesprächsfortschritt:** Prozentbalken über Stammdaten, Fragen und Datenschutz-Pflichtangaben. Offene ★-Fragen werden einzeln genannt.
 - **Vorlagen & Rechtstexte:** Fragen und Texte bearbeiten. Die Änderungen gelten für alle Kunden.
+- **Vertrieb (CRM)** oben in jeder Kundenakte: Status *Neu → Angerufen → Termin vereinbart → Unterschrieben → Abgeschlossen* oder *Verloren*, Termin, Wiedervorlage, Quelle und Gesprächsprotokoll. „Unterschrieben“ setzt die App automatisch bei der Unterschrift; ein Anruf-Eintrag setzt „Angerufen“, ein Termin-Datum „Termin vereinbart“. Jeder Statuswechsel wird mit Zeit gespeichert.
+- **Dashboard:** Kunden gesamt, Abschlüsse, Abschlussquote, offene und abgeschlossene Angebotssummen (netto), Anzahl je Status mit Filter, Trichter vom Kontakt zum Abschluss, nächste Termine, fällige Wiedervorlagen und Kundenliste. Es braucht keine Einrichtung; die Zahlen kommen aus den Kundenakten.
 - **Konto & Team:** eigenes Passwort ändern (mit aktuellem Passwort bestätigt). Als Inhaber Personen per E-Mail einladen, den Link erneut senden oder den Zugang entfernen. Eingeladene legen ihr Passwort über den Link selbst fest und sehen alle Kunden.
 - **Passwort vergessen?** auf der Anmeldeseite schickt einen Link zum Neusetzen, aber nur an Adressen aus dem Team.
 
