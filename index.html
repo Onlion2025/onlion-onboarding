@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ONLION Onboarding</title>
-<meta name="theme-color" content="#0e0e0e">
+<meta name="theme-color" content="#f5f5f1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="ONLION">
 <meta name="robots" content="noindex,nofollow">
 <link rel="manifest" href="manifest.webmanifest">
@@ -18,12 +18,12 @@
 <style>
 /* Layout: ONLION-Cockpit – Seitenleiste (Kunden, Ablauf) + Arbeitsfläche; Formular + Live-Dokument nebeneinander */
 :root{
-  --bg:#0e0e0e; --panel:#161616; --panel2:#1d1d1d; --line:#2a2a2a; --fg:#f2f2f0; --muted:#a8a8a3;
-  --lime:#c8ff00; --lime-ink:#0e0e0e; --warn:#ffb347; --ok:#7ee08a;
+  --bg:#f5f5f1; --panel:#ffffff; --panel2:#efefea; --line:#e2e2db; --line-strong:#c9c9c0; --fg:#141414; --muted:#5d5d56;
+  --lime:#c8ff00; --lime-ink:#0e0e0e; --accent-ink:#4a6600; --field:#ffffff;
   --paper:#ffffff; --ink:#1c1c1c; --ink-muted:#5f5b55;
   --sans:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
   --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
-  color-scheme:dark;
+  color-scheme:light;
 }
 html,body{height:100%}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -32,29 +32,29 @@ img{max-width:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.45}
 *{box-sizing:border-box}
 button,input,textarea,select{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--lime);outline-offset:2px}
+:focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px}
 .app{display:flex;flex-wrap:wrap;min-height:100%}
 .side{flex:1 1 250px;max-width:280px;background:var(--panel);border-right:1px solid var(--line);padding-block:24px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:18px;display:flex;flex-direction:column;gap:24px}
 .main{flex:999 1 560px;min-width:0;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .main-inner{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:22px;padding-inline:clamp(0px,2vw,24px)}
 .brand img{width:150px;display:block}
-.brand .prod{color:var(--lime);font-weight:600;font-size:15px;margin-top:6px}
+.brand .prod{color:var(--accent-ink);font-weight:600;font-size:15px;margin-top:6px}
 .label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .group{display:flex;flex-direction:column;gap:6px}
-.navbtn{display:block;width:100%;text-align:left;min-height:44px;padding:10px 12px;border-radius:10px;border:0;background:transparent;color:#d6d6d2;cursor:pointer}
+.navbtn{display:block;width:100%;text-align:left;min-height:44px;padding:10px 12px;border-radius:10px;border:0;background:transparent;color:var(--fg);cursor:pointer}
 .navbtn:hover{background:var(--panel2)}
 .navbtn.on{background:var(--lime);color:var(--lime-ink);font-weight:700}
 .navbtn small{display:block;font-size:12px;opacity:.75;font-weight:400}
 .step{display:flex;gap:10px;align-items:center}
 .dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--muted);flex:none}
-.dot.done{background:var(--lime);border-color:var(--lime)}
-.dot.now{border-color:var(--lime)}
-.btn{min-height:46px;padding:0 20px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer;font-weight:500}
-.btn:hover{border-color:#4a4a4a}
+.dot.done{background:var(--lime);border-color:var(--accent-ink)}
+.dot.now{border-color:var(--accent-ink)}
+.btn{min-height:46px;padding:0 20px;border-radius:12px;border:1px solid var(--line-strong);background:var(--panel);color:var(--fg);cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--line-strong);background:var(--panel2)}
 .btn.primary{background:var(--lime);color:var(--lime-ink);border:0;font-weight:700}
 .btn.primary:disabled{opacity:.35;cursor:not-allowed}
-.btn.ghost-dashed{border-style:dashed;color:var(--lime);width:100%}
-.btn.danger{color:#ff9b8a;border-color:#5a2a24}
+.btn.ghost-dashed{border-style:dashed;color:var(--accent-ink);background:transparent;width:100%}
+.btn.danger{color:#b42318;border-color:#f1b8b0}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .spacer{flex:1}
 h1{margin:0;font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.01em;text-wrap:balance}
@@ -66,48 +66,50 @@ h2{margin:0;font-size:20px;font-weight:700;text-wrap:balance}
 .field label{font-size:13px;font-weight:600}
 .login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px;z-index:30}
 .login-card{width:min(420px,100%)}
-input[type=text],input[type=email],input[type=tel],input[type=password],textarea,select{background:var(--bg);border:1px solid #333;border-radius:10px;padding:11px 12px;min-height:44px;width:100%}
+input[type=text],input[type=email],input[type=tel],input[type=password],textarea,select{background:var(--field);border:1px solid var(--line-strong);border-radius:10px;padding:11px 12px;min-height:44px;width:100%}
 textarea{min-height:76px;resize:vertical}
 input:disabled,textarea:disabled,select:disabled{opacity:.6}
 .check{display:flex;gap:10px;align-items:flex-start;min-height:44px;padding-block:6px}
-.check input{width:20px;height:20px;margin-top:1px;accent-color:var(--lime);flex:none}
-.stages{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;list-style:none;margin:0;padding:0}
-.stage{border-radius:16px;padding:18px;min-height:170px;display:flex;flex-direction:column;gap:8px;background:var(--panel);border:1px solid var(--line);text-align:left;cursor:pointer;color:var(--fg);width:100%}
-.stage:hover{border-color:#4a4a4a}
+.check input{width:20px;height:20px;margin-top:1px;accent-color:var(--accent-ink);flex:none}
+.stages{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;list-style:none;margin:0;padding:0}
+.stages>li{display:flex;min-width:0}
+.stage{border-radius:16px;padding:18px;min-height:170px;height:100%;display:flex;flex-direction:column;justify-content:flex-start;gap:8px;background:var(--panel);border:1px solid var(--line);text-align:left;cursor:pointer;color:var(--fg);width:100%}
+.stage:hover{border-color:var(--line-strong)}
 .stage.done{background:var(--lime);color:var(--lime-ink);border-color:var(--lime)}
-.stage.now{border:2px solid var(--lime)}
+.stage.now{border-color:var(--accent-ink);box-shadow:inset 0 0 0 1px var(--accent-ink)}
 .stage.locked{opacity:.55;cursor:default}
 .stage .k{font-size:12px;font-weight:700;letter-spacing:.06em}
 .stage .t{font-size:18px;font-weight:800}
 .stage .d{font-size:13px;line-height:1.4}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
-.chip{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid #333;background:transparent;color:#d6d6d2;cursor:pointer;font-size:13px}
+.chip{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--line-strong);background:var(--panel);color:var(--fg);cursor:pointer;font-size:13px}
 .chip.on{background:var(--lime);color:var(--lime-ink);border-color:var(--lime);font-weight:600}
 .q{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px}
-.q.star{border-color:#4d5f12}
+.q.star{border-color:#b9d36b}
 .q label{font-weight:600}
-.star-mark{color:var(--lime)}
-.progress{width:180px;height:8px;background:#262626;border-radius:4px;overflow:hidden}
+.star-mark{color:var(--accent-ink)}
+.progress{width:180px;height:8px;background:var(--line);border-radius:4px;overflow:hidden}
 .progress>div{height:100%;background:var(--lime)}
 .tabnum{font-variant-numeric:tabular-nums}
 .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:18px;align-items:start}
-.paper{background:var(--paper);color:var(--ink);border-radius:6px;padding:clamp(20px,4vw,44px);font-family:var(--serif);font-size:14px;line-height:1.6;box-shadow:0 4px 24px rgba(0,0,0,.45);max-height:78vh;overflow:auto}
+.paper{background:var(--paper);color:var(--ink);border-radius:6px;padding:clamp(20px,4vw,44px);font-family:var(--serif);font-size:14px;line-height:1.6;box-shadow:0 2px 14px rgba(0,0,0,.07);border:1px solid var(--line);max-height:78vh;overflow:auto}
 .paper .ph{display:flex;justify-content:space-between;align-items:center;font-family:var(--sans);font-size:11px;color:var(--ink-muted);gap:10px;flex-wrap:wrap}
 .paper .ph img{width:90px}
 .paper .bar{height:3px;width:48px;background:var(--lime);margin:12px 0}
 .paper pre{white-space:pre-wrap;font-family:inherit;margin:0}
 .banner{border-radius:12px;padding:12px 16px;font-size:14px;border:1px solid}
-.banner.warn{border-color:#6b4a14;background:#211a0d;color:#ffd79a}
-.banner.ok{border-color:#2f5f36;background:#0f1d11;color:#b8f2bf}
-.banner.info{border-color:#3a3a3a;background:var(--panel2);color:#d6d6d2}
+.banner.warn{border-color:#f2d39b;background:#fff8eb;color:#7a4b00}
+.banner.ok{border-color:#b7e1bd;background:#effaf0;color:#1f5f2a}
+.banner.info{border-color:var(--line);background:var(--panel2);color:var(--fg)}
 .pad-wrap{display:flex;flex-direction:column;gap:8px}
-canvas.pad{width:100%;height:170px;background:#fbfbf8;border-radius:12px;touch-action:none;cursor:crosshair;display:block}
-.sigimg{background:#fbfbf8;border-radius:10px;max-width:320px;width:100%}
-.empty{border:1px dashed #3a3a3a;border-radius:16px;padding:28px;color:var(--muted);display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--line-strong);border-radius:12px;touch-action:none;cursor:crosshair;display:block}
+.sigimg{background:#ffffff;border:1px solid var(--line);border-radius:10px;max-width:320px;width:100%}
+.empty{border:1px dashed var(--line-strong);border-radius:16px;padding:28px;color:var(--muted);display:flex;flex-direction:column;gap:12px;align-items:flex-start}
 .toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--lime);color:var(--lime-ink);padding:12px 16px;border-radius:12px;font-weight:600;z-index:20}
 .tpl-q{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;word-break:break-all;color:var(--muted)}
-.confirm{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#24110e;border:1px solid #5a2a24;border-radius:12px;padding:10px 12px}
+.confirm{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#fff1ef;border:1px solid #f1b8b0;border-radius:12px;padding:10px 12px}
+@media (max-width:1060px){.stages{grid-template-columns:minmax(0,1fr)}.stage{min-height:0}}
 @media (max-width:860px){.split{grid-template-columns:minmax(0,1fr)}.side{max-width:none;flex-basis:100%;border-right:0;border-bottom:1px solid var(--line)}.paper{max-height:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -115,8 +117,8 @@ canvas.pad{width:100%;height:170px;background:#fbfbf8;border-radius:12px;touch-a
 <body>
 <div class="login" id="login" hidden>
   <form class="card login-card" id="loginForm">
-    <img src="logo-white.png" alt="ONLION" style="width:170px">
-    <div class="eyebrow" style="color:var(--lime);font-weight:600">KI-Telefon-Agent · Onboarding</div>
+    <img src="logo-black.png" alt="ONLION" style="width:170px">
+    <div class="eyebrow" style="color:var(--accent-ink);font-weight:600">KI-Telefon-Agent · Onboarding</div>
     <div class="field"><label for="lg-mail">E-Mail</label><input type="email" id="lg-mail" autocomplete="username" required></div>
     <div class="field"><label for="lg-pw">Passwort</label><input type="password" id="lg-pw" autocomplete="current-password" required></div>
     <div id="lg-err" class="banner warn" hidden></div>
@@ -125,7 +127,7 @@ canvas.pad{width:100%;height:170px;background:#fbfbf8;border-radius:12px;touch-a
 </div>
 <div class="app">
   <nav class="side" aria-label="Navigation">
-    <div class="brand"><img src="logo-white.png" alt="ONLION"><div class="prod" id="prodName">KI-Telefon-Agent</div></div>
+    <div class="brand"><img src="logo-black.png" alt="ONLION"><div class="prod" id="prodName">KI-Telefon-Agent</div></div>
     <div class="group">
       <div class="label">Kunden</div>
       <div id="custList"></div>
