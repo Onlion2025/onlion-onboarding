@@ -171,6 +171,38 @@ try:
         ok('Kundenakte mit Vertrieb Handy ohne Querscrollen (%d)' % sw, sw <= 390)
         page.screenshot(path=T + '/c-kunde-handy.png', full_page=True)
 
+        # Gleichzeitiges Arbeiten: Eintrag eines anderen Mitglieds bleibt erhalten
+        page.set_viewport_size({'width': 1194, 'height': 834})
+        page.click('#custList .navbtn:has-text("Lead AG")'); page.wait_for_selector('#cr-log')
+        page.fill('#cr-log', 'Rückruf vereinbart')
+        page.evaluate("()=>{const r=[...__rows.values()].find(r=>r.data.firma==='Lead AG');r.data.crm.log=[{at:'2026-10-28T09:00:00.000Z',by:'a@b.de',type:'Notiz',text:'Eintrag vom Partner'}].concat(r.data.crm.log);}")
+        page.click('button:has-text("Eintrag speichern")'); page.wait_for_timeout(600)
+        lead = page.evaluate("()=>[...__rows.values()].find(r=>r.data.firma==='Lead AG').data")
+        texts = [e['text'] for e in lead['crm']['log']]
+        ok('Gleichzeitige Einträge gehen nicht verloren (%s)' % ', '.join(texts), 'Eintrag vom Partner' in texts and 'Rückruf vereinbart' in texts and 'Erstgespräch, Interesse an Pilot' in texts)
+        page.click('.logi:has-text("Rückruf vereinbart") >> button:has-text("Löschen")'); page.click('button:has-text("Löschen bestätigen")'); page.wait_for_timeout(500)
+        ok('Protokolleintrag löschbar', 'Rückruf vereinbart' not in page.inner_text('.log'))
+        ok('Erfasser wird angezeigt', 'a@b.de' in page.inner_text('.log'))
+        page.click('.chip:has-text("Abgeschlossen")'); page.wait_for_selector('.confirm:has-text("noch nicht unterschrieben")')
+        ok('Abgeschlossen ohne Unterschrift fragt nach', page.evaluate("()=>[...__rows.values()].find(r=>r.data.firma==='Lead AG').data.crm.status") == 'termin')
+        page.click('.confirm >> button:has-text("Abbrechen")')
+        # Neue Version setzt „Unterschrieben“ zurück
+        page.evaluate("()=>{const r=[...__rows.values()].find(r=>r.data.firma==='Test GmbH');r.data.crm.status='unterschrieben';}")
+        page.fill('#cr-wv', '2020-01-02'); page.dispatch_event('#cr-wv', 'change'); page.wait_for_timeout(500)  # löst Neuladen aus wie Realtime
+        page.click('#custList .navbtn:has-text("Test GmbH")'); page.wait_for_timeout(300)
+        page.click('nav >> text=Unterschrift'); page.click('button:has-text("Neue Version starten")'); page.click('button:has-text("Ja, neue Version")'); page.wait_for_timeout(600)
+        tg = page.evaluate("()=>[...__rows.values()].find(r=>r.data.firma==='Test GmbH').data")
+        ok('Neue Version: Status zurück vor „Unterschrieben“ (%s)' % tg['crm']['status'], tg['crm']['status'] not in ('unterschrieben', 'abgeschlossen') and not tg.get('signature'))
+        page.click('#navDash'); page.wait_for_selector('.kpis')
+        hs = page.evaluate("()=>[...document.querySelectorAll('.kpi')].map(e=>Math.round(e.getBoundingClientRect().height)+'x'+Math.round(e.getBoundingClientRect().width))")
+        ok('6 gleich große Kacheln (%s)' % ', '.join(hs), len(hs) == 6 and len(set(hs)) == 1)
+        page.screenshot(path=T + '/c-dashboard.png', full_page=True)
+        page.set_viewport_size({'width': 390, 'height': 844}); page.wait_for_timeout(200)
+        hs = page.evaluate("()=>[...document.querySelectorAll('.kpi')].map(e=>Math.round(e.getBoundingClientRect().width))")
+        ok('Handy: Kacheln gleich breit', len(set(hs)) == 1)
+        page.screenshot(path=T + '/c-dashboard-handy.png', full_page=True)
+        page.set_viewport_size({'width': 1194, 'height': 834})
+
         # ---------- Konto & Team ----------
         page.set_viewport_size({'width': 1194, 'height': 834})
         page.click('#navKonto'); page.wait_for_selector('#pc-old')

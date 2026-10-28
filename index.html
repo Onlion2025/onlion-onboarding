@@ -129,12 +129,12 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
 .toast{position:fixed;left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);top:calc(16px + env(safe-area-inset-top,0px));background:var(--lime);color:var(--lime-ink);padding:12px 16px;border-radius:12px;font-weight:600;z-index:20}
 .tpl-q{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;word-break:break-all;color:var(--muted)}
-.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
-@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media (max-width:600px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpis .kpi:first-child{grid-column:1/-1}}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+@media (max-width:1400px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:600px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .kpi{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:6px;min-height:118px;min-width:0}
 .kpi .kn{font-size:clamp(20px,2.2vw,28px);font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.15;white-space:nowrap}
-.kpi .kl{font-size:13px;color:var(--muted);font-weight:600}
+.kpi .kl{font-size:13px;color:var(--muted);font-weight:600;min-height:2.6em}
 .kpi .ks{font-size:12px;color:var(--muted)}
 .kpi.hl{background:var(--lime);border-color:var(--lime);color:var(--lime-ink)}.kpi.hl .kl,.kpi.hl .ks{color:var(--lime-ink)}
 .pipe{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
@@ -193,6 +193,7 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
   .mobile-back{display:inline-flex;align-items:center;align-self:flex-start}
   .main{padding-block:18px 40px}
 }
+@media (max-width:860px){.toast{top:auto;bottom:calc(16px + env(safe-area-inset-bottom,0px))}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -302,7 +303,7 @@ function reached(c){let r=CRM_RANK[stat(c)]||0;for(const e of (crmOf(c).history|
 function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function fmtDay(s){if(!s)return '';try{const d=new Date(s.length<=10?s+'T12:00':s);return d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})+(s.length>10?', '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}):'');}catch(e){return s;}}
 function crmPatch(c,status){
-  const cr=crmOf(c);const hist=(cr.history||[]).concat([{s:status,at:new Date().toISOString(),by:(S.me&&S.me.email)||''}]);
+  const cr=crmOf(cur()&&cur().id===c.id?cur():c);const hist=(cr.history||[]).concat([{s:status,at:new Date().toISOString(),by:(S.me&&S.me.email)||''}]);
   return {crm:{status,history:hist}};
 }
 const STAMM=[['firma','Firma'],['ansprechpartner','Ansprechpartner'],['email','E-Mail'],['telefon','Telefon'],['adresse','Adresse']];
@@ -353,6 +354,16 @@ function fill(text,c){
 
 /* ---------- writes ---------- */
 const timers={};
+/* Listen im CRM werden beim Speichern mit dem Stand in der Datenbank vereinigt, damit
+   gleichzeitige Einträge mehrerer Team-Mitglieder nicht verloren gehen. */
+function unionBy(a,b,key){const m=new Map();for(const x of (a||[]).concat(b||[]))m.set(key(x),x);return [...m.values()];}
+function mergeCrm(curCrm,pCrm){
+  const out={};
+  if(pCrm.log)out.log=unionBy(curCrm.log,pCrm.log,e=>e.at+'|'+e.by+'|'+e.text).sort((x,y)=>String(y.at).localeCompare(String(x.at)));
+  if(pCrm.history)out.history=unionBy(curCrm.history,pCrm.history,e=>e.at+'|'+e.by+'|'+e.s).sort((x,y)=>String(x.at).localeCompare(String(y.at)));
+  if(pCrm.logDel)out.logDel=unionBy(curCrm.logDel,pCrm.logDel,k=>k);
+  return out;
+}
 function deepMerge(t,p){for(const k in p){const v=p[k];if(v&&typeof v==='object'&&!Array.isArray(v)){if(!t[k]||typeof t[k]!=='object')t[k]={};deepMerge(t[k],v);}else t[k]=v;}return t;}
 function saveCust(id,patch,delay){
   if(!S.db)return;
@@ -526,7 +537,7 @@ function viewUnterschrift(c){
   if(signed(c)){
     const sg=c.signature;
     const reset=S.confirm==='unsign'+c.id
-      ?h('div',{class:'confirm'},'Unterschrift zurückziehen und neue Version starten? Das bisherige PDF bleibt gültig, die Akte wird wieder bearbeitbar.',h('button',{type:'button',class:'btn danger',onclick:async()=>{const hist=(c.history||[]).concat([sg]);await S.db.doc('customers/'+c.id).update({signature:null,history:hist,pdfAt:null});S.confirm=null;toast('Neue Version gestartet');render();}},'Ja, neue Version'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
+      ?h('div',{class:'confirm'},'Unterschrift zurückziehen und neue Version starten? Das bisherige PDF bleibt gültig, die Akte wird wieder bearbeitbar.',h('button',{type:'button',class:'btn danger',onclick:async()=>{const hist=(c.history||[]).concat([sg]);const up={signature:null,history:hist,pdfAt:null};if((crmOf(c).status||'')==='unterschrieben'){const prev=(crmOf(c).history||[]).slice().reverse().find(e=>(CRM_RANK[e.s]||0)<CRM_RANK.unterschrieben);Object.assign(up,crmPatch(c,prev?prev.s:'termin'));}await S.db.doc('customers/'+c.id).update(up);S.confirm=null;toast('Neue Version gestartet');render();}},'Ja, neue Version'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
       :h('button',{type:'button',class:'btn danger',onclick:()=>{S.confirm='unsign'+c.id;render();}},'Neue Version starten');
     return [h('div',null,h('div',{class:'eyebrow'},c.firma),h('h1',null,'Unterschrift')),
       h('div',{class:'banner ok'},'Unterschrieben am '+fmtDate(sg.signedAt)+' in '+sg.ort+'.'),
@@ -811,8 +822,9 @@ function crmCard(c){
     chips.append(h('button',{type:'button',class:'chip'+(cs===st.id?' on':''),'aria-pressed':cs===st.id?'true':'false',onclick:()=>{
       if(cs===st.id&&!auto)return;
       if(st.id==='unterschrieben'&&!signed(c)){toast('„Unterschrieben“ setzt die App automatisch nach der Unterschrift.');return;}
+      if(st.id==='abgeschlossen'&&!signed(c)&&S.confirm!=='abg'+c.id){S.confirm='abg'+c.id;render();return;}
       if(signed(c)&&(CRM_RANK[st.id]||0)<CRM_RANK.unterschrieben&&st.id!=='verloren'){toast('Die Akte ist unterschrieben. Für einen früheren Status zuerst eine neue Version starten.');return;}
-      saveCust(c.id,crmPatch(c,st.id),0);toast('Status: '+st.t);render._force=true;render();
+      S.confirm=null;saveCust(c.id,crmPatch(c,st.id),0);toast('Status: '+st.t);render._force=true;render();
     }},h('span',{class:'slab'},h('span',{class:'sdot st-'+st.id,'aria-hidden':'true'}),st.t)));
   }
   const fld=(id,label,el)=>h('div',{class:'field'},h('label',{for:id},label),el);
@@ -826,32 +838,42 @@ function crmCard(c){
   const addLog=h('button',{type:'button',class:'btn primary',onclick:()=>{
     const text=ta.value.trim();if(!text){toast('Bitte zuerst etwas eintragen.');return;}
     const entry={at:new Date().toISOString(),by:(S.me&&S.me.email)||'',type:S.logType,text};
-    const p={crm:{log:[entry].concat(cr.log||[])}};
+    const p={crm:{log:[entry].concat(crmOf(cur()||c).log||[])}};
     if(S.logType==='Anruf'&&cs==='neu')Object.assign(p.crm,crmPatch(c,'angerufen').crm);
     saveCust(c.id,p,0);ta.value='';toast(p.crm.status?'Gespeichert · Status: Angerufen':'Eintrag gespeichert');render._force=true;render();
   }},'Eintrag speichern');
   const log=h('div',{class:'log'});
-  for(const e of (cr.log||[]).slice(0,S.logAll===c.id?999:5))log.append(h('div',{class:'logi'},h('div',{class:'lm'},fmtDate(e.at)+' · '+e.type),h('div',{style:'white-space:pre-wrap;overflow-wrap:anywhere'},e.text)));
-  if((cr.log||[]).length>5&&S.logAll!==c.id)log.append(h('button',{type:'button',class:'linkbtn',onclick:()=>{S.logAll=c.id;render._force=true;render();}},'Alle '+cr.log.length+' Einträge zeigen'));
+  const dels=new Set(cr.logDel||[]),entries=(cr.log||[]).filter(e=>!dels.has(e.at+'|'+e.by));
+  for(const e of entries.slice(0,S.logAll===c.id?999:5)){
+    const k=e.at+'|'+e.by;
+    log.append(h('div',{class:'logi'},h('div',{class:'lm row',style:'gap:8px'},h('span',null,fmtDate(e.at)+' · '+e.type+(e.by?' · '+e.by:'')),h('span',{class:'spacer'}),
+      S.confirm==='log:'+k?h('span',{class:'row',style:'gap:6px'},h('button',{type:'button',class:'linkbtn',style:'color:#b42318',onclick:()=>{saveCust(c.id,{crm:{logDel:(crmOf(cur()||c).logDel||[]).concat([k])}},0);S.confirm=null;toast('Eintrag gelöscht');render();}},'Löschen bestätigen'),h('button',{type:'button',class:'linkbtn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
+        :h('button',{type:'button',class:'linkbtn','aria-label':'Eintrag löschen',onclick:()=>{S.confirm='log:'+k;render();}},'Löschen')),
+      h('div',{style:'white-space:pre-wrap;overflow-wrap:anywhere'},e.text)));
+  }
+  if(entries.length>5&&S.logAll!==c.id)log.append(h('button',{type:'button',class:'linkbtn',onclick:()=>{S.logAll=c.id;render._force=true;render();}},'Alle '+entries.length+' Einträge zeigen'));
   const hist=(cr.history||[]).slice(-1)[0];
   return h('section',{class:'card','aria-label':'Vertrieb'},
     h('div',{class:'row'},h('h2',null,'Vertrieb'),h('div',{class:'spacer'}),hist?h('div',{class:'eyebrow'},'Status seit '+fmtDate(hist.at)):null),
     chips,
+    S.confirm==='abg'+c.id?h('div',{class:'confirm'},'Diese Akte ist noch nicht unterschrieben. Trotzdem als „Abgeschlossen“ markieren?',h('button',{type:'button',class:'btn primary',onclick:()=>{S.confirm=null;saveCust(c.id,crmPatch(c,'abgeschlossen'),0);toast('Status: Abgeschlossen');render();}},'Ja, abgeschlossen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen')):null,
     h('div',{class:'grid2'},fld('cr-termin','Termin',termin),fld('cr-wv','Wiedervorlage (nächster Kontakt)',wv),fld('cr-quelle','Quelle',qsel)),
     h('div',{class:'field'},h('label',{for:'cr-log'},'Gesprächsprotokoll'),tchips,ta),
     h('div',{class:'row'},addLog,h('div',{class:'eyebrow'},'Ein „Anruf“ bei einem neuen Kunden setzt den Status auf „Angerufen“, ein Termin-Datum auf „Termin vereinbart“.')),
-    (cr.log||[]).length?log:null);
+    entries.length?log:null);
 }
 const eur0=n=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n||0);
 function offerNet(c){return offerTotals((c.offer&&c.offer.items)||[]).net;}
 function viewDashboard(){
   const cs=S.customers,n=cs.length,today=todayStr(),month=today.slice(0,7);
+  const in7=(()=>{const d=new Date();d.setDate(d.getDate()+7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
+  const locMonth=iso=>{const d=new Date(iso);return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');};
   const by={};for(const st of CRM)by[st.id]=[];for(const c of cs)(by[stat(c)]||by.neu).push(c);
   const won=by.abgeschlossen,lost=by.verloren;
   const openStates=['neu','angerufen','termin','unterschrieben'];
   const openVal=cs.filter(c=>openStates.includes(stat(c))).reduce((s,c)=>s+offerNet(c),0);
   const wonVal=won.reduce((s,c)=>s+offerNet(c),0);
-  const newM=cs.filter(c=>String(c.createdAt||'').slice(0,7)===month).length;
+  const newM=cs.filter(c=>locMonth(c.createdAt)===month).length;
   const decided=won.length+lost.length;
   const kpi=(l,v,sub,hl)=>h('div',{class:'kpi'+(hl?' hl':'')},h('div',{class:'kl'},l),h('div',{class:'kn'},v),sub?h('div',{class:'ks'},sub):null);
   const kpis=h('div',{class:'kpis'},
@@ -859,7 +881,8 @@ function viewDashboard(){
     kpi('Abgeschlossen',String(won.length),n?Math.round(won.length/n*100)+' % aller Kunden':'noch keine Kunden',true),
     kpi('Abschlussquote',decided?Math.round(won.length/decided*100)+' %':'–',decided?'von '+decided+' entschiedenen':'noch nichts entschieden'),
     kpi('Angebote offen',eur0(openVal),'netto, laufende Kunden'),
-    kpi('Umsatz abgeschlossen',eur0(wonVal),'netto, laut Angebot'));
+    kpi('Umsatz abgeschlossen',eur0(wonVal),'netto, laut Angebot'),
+    kpi('Termine in 7 Tagen',String(cs.filter(c=>{const t=(crmOf(c).termin||'').slice(0,10);return t&&t>=today&&t<=in7;}).length),'ab heute'));
   // Pipeline-Kacheln mit Filter
   const f=S.dashFilter||'';
   const pipe=h('div',{class:'pipe'});
@@ -872,11 +895,11 @@ function viewDashboard(){
   });
   const open=c=>{S.curId=c.id;S.view='start';render();window.scrollTo(0,0);};
   // Termine und Wiedervorlagen
-  const terms=cs.filter(c=>crmOf(c).termin&&crmOf(c).termin.slice(0,10)>=today&&!['abgeschlossen','verloren'].includes(stat(c))).sort((a,b)=>crmOf(a).termin<crmOf(b).termin?-1:1);
+  const terms=cs.filter(c=>crmOf(c).termin&&!['abgeschlossen','verloren','unterschrieben'].includes(stat(c))&&(crmOf(c).termin.slice(0,10)>=today||stat(c)==='termin')).sort((a,b)=>crmOf(a).termin<crmOf(b).termin?-1:1);
   const wvs=cs.filter(c=>crmOf(c).wv&&!['abgeschlossen','verloren'].includes(stat(c))).sort((a,b)=>crmOf(a).wv<crmOf(b).wv?-1:1);
   const tl=h('div',{class:'dlist'});
   if(!terms.length)tl.append(h('div',{class:'eyebrow'},'Keine anstehenden Termine.'));
-  for(const c of terms.slice(0,8))tl.append(h('button',{type:'button',class:'ditem',onclick:()=>open(c)},h('span',{class:'dn'},c.firma||'Ohne Namen'),h('span',{class:'dd'},fmtDay(crmOf(c).termin))));
+  for(const c of terms.slice(0,8)){const past=crmOf(c).termin.slice(0,10)<today;tl.append(h('button',{type:'button',class:'ditem',onclick:()=>open(c)},h('span',{class:'dn'},c.firma||'Ohne Namen'),h('span',{class:'dd'+(past?' late':'')},(past?'Vorbei, Ergebnis eintragen · ':'')+fmtDay(crmOf(c).termin))));}
   const wl=h('div',{class:'dlist'});
   if(!wvs.length)wl.append(h('div',{class:'eyebrow'},'Keine Wiedervorlagen eingetragen.'));
   for(const c of wvs.slice(0,8)){const late=crmOf(c).wv<today,due=crmOf(c).wv===today;wl.append(h('button',{type:'button',class:'ditem',onclick:()=>open(c)},h('span',{class:'dn'},c.firma||'Ohne Namen'),h('span',{class:'dd'+(late?' late':'')},(late?'Überfällig · ':due?'Heute · ':'')+fmtDay(crmOf(c).wv))));}
@@ -884,7 +907,7 @@ function viewDashboard(){
   const list=(f?by[f]:cs.slice()).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
   const tb=h('tbody');
   for(const c of list){
-    const last=(crmOf(c).log||[])[0];
+    const dl=new Set(crmOf(c).logDel||[]);const last=(crmOf(c).log||[]).find(e=>!dl.has(e.at+'|'+e.by));
     tb.append(h('tr',{class:'clk',tabindex:'0',onclick:()=>open(c),onkeydown:e=>{if(e.key==='Enter')open(c);}},
       h('td',null,h('strong',null,c.firma||'Ohne Namen')),h('td',null,statEl(stat(c))),
       h('td',{class:'hide-m'},crmOf(c).termin?fmtDay(crmOf(c).termin):'–'),
@@ -1027,7 +1050,7 @@ function makeDb(sb){
     return {id,
       get:async()=>snap(id,await fetchDoc(col,id)),
       set:d=>enqueue(key,async()=>{await write(col,id,d);notify(col);}),
-      update:p=>enqueue(key,async()=>{const cur=await fetchDoc(col,id);if(!cur)throw new Error('Datensatz nicht gefunden');await write(col,id,deepMerge(JSON.parse(JSON.stringify(cur)),JSON.parse(JSON.stringify(p))));notify(col);}),
+      update:p=>enqueue(key,async()=>{const cur=await fetchDoc(col,id);if(!cur)throw new Error('Datensatz nicht gefunden');const pp=JSON.parse(JSON.stringify(p));if(pp.crm&&typeof pp.crm==='object')Object.assign(pp.crm,mergeCrm((cur.crm)||{},pp.crm));await write(col,id,deepMerge(JSON.parse(JSON.stringify(cur)),pp));notify(col);}),
       delete:()=>enqueue(key,async()=>{const {error}=await sb.from('docs').delete().eq('collection',col).eq('id',id);if(error)throw error;notify(col);}),
       onSnapshot(cb,err){const l={type:'doc',col,id,cb,err};listeners.add(l);emit(l);return()=>listeners.delete(l);}
     };
