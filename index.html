@@ -952,21 +952,26 @@ function viewKonto(){
       if(chk.error){say('warn','Das aktuelle Passwort stimmt nicht.');return;}
       const {error}=await S.sb.auth.updateUser({password:a});
       if(error){say('warn',pwErrorText(error));return;}
-      (document.getElementById('pc-new')&&document.getElementById('pc-new').form||form).reset();say('ok','Passwort geändert. Beim nächsten Anmelden gilt das neue Passwort.');
-    }finally{btn.disabled=false;btn.textContent='Passwort ändern';}
+      S.pwOpen=false;S.pwMsg=['ok','Passwort geändert. Beim nächsten Anmelden gilt das neue Passwort.'];render._force=true;render();
+    }finally{btn.disabled=false;btn.textContent='Speichern';}
   }},
     h('h2',null,'Dein Konto'),
-    h('div',{class:'eyebrow',style:'overflow-wrap:anywhere'},'Angemeldet als ',h('strong',null,me.email),h('span',{class:'tag'+(owner?' lime':'')},owner?'Inhaber':'Mitglied')),
+    h('div',{class:'eyebrow',style:'overflow-wrap:anywhere'},h('strong',null,me.email),h('span',{class:'tag'+(owner?' lime':'')},owner?'Inhaber':'Mitglied')),
     h('input',{type:'email',autocomplete:'username',value:me.email,hidden:true,'aria-hidden':'true',tabindex:'-1'}),
     h('div',{class:'grid2'},pwField('pc-old','Aktuelles Passwort','current-password'),h('div')),
     h('div',{class:'grid2'},pwField('pc-new','Neues Passwort','new-password'),pwField('pc-rep','Neues Passwort wiederholen','new-password')),
     h('div',{class:'eyebrow'},'Mindestens 10 Zeichen.'),
     msg,
-    h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Passwort ändern')));
-  out.push(form);
+    h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Speichern'),h('button',{type:'button',class:'btn',onclick:()=>{S.pwOpen=false;S.pwMsg=null;render();}},'Abbrechen')));
+  // Kompakt: Formular erst nach Tippen auf „Passwort ändern“
+  const compact=h('section',{class:'card',style:'gap:10px'},
+    h('div',{class:'row',style:'gap:10px'},h('h2',null,'Dein Konto'),h('div',{class:'spacer'}),h('button',{type:'button',class:'btn',id:'pc-open',onclick:()=>{S.pwOpen=true;S.pwMsg=null;render();setTimeout(()=>{const f=document.getElementById('pc-old');f&&f.focus();},0);}},'Passwort ändern')),
+    h('div',{class:'eyebrow',style:'overflow-wrap:anywhere'},h('strong',null,me.email),h('span',{class:'tag'+(owner?' lime':'')},owner?'Inhaber':'Mitglied')),
+    S.pwMsg?h('div',{id:'pc-msg',class:'banner '+S.pwMsg[0]},S.pwMsg[1]):null);
+  out.push(S.pwOpen?form:compact);
   // Team
   const team=h('section',{class:'card'},h('h2',null,'Team'),
-    h('p',{style:'margin:0;max-width:70ch'},'Alle im Team sehen dieselben Kunden, Vorlagen und Rechtstexte, können Kundenakten bearbeiten, unterschreiben lassen und PDFs versenden. '+(owner?'Einladen und Entfernen kannst nur du als Inhaber.':'Einladen und Entfernen kann nur das Inhaber-Konto.')));
+    h('p',{class:'eyebrow',style:'margin:0;max-width:70ch'},'Alle im Team sehen und bearbeiten dieselben Kunden. '+(owner?'Einladen und Entfernen kannst nur du.':'Einladen und Entfernen kann nur das Inhaber-Konto.')));
   if(S.teamError)team.append(h('div',{class:'banner warn'},'Die Team-Liste ist noch nicht eingerichtet. Bitte in Supabase supabase/team.sql ausführen und die Seite neu laden.'));
   else if(!S.team.length)team.append(h('div',{class:'eyebrow'},'Team-Liste wird geladen …'));
   for(const m of S.team){
@@ -1025,7 +1030,7 @@ document.addEventListener('focusout',()=>{setTimeout(()=>{const a=document.activ
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button');if(b)render._force=true;setTimeout(()=>render._force=false,0);},true);
 document.getElementById('navTpl').addEventListener('click',()=>{S.view='vorlagen';render();});
 document.getElementById('navDash').addEventListener('click',()=>{S.view='dashboard';render();window.scrollTo(0,0);});
-document.getElementById('navKonto').addEventListener('click',()=>{S.view='konto';S.confirm=null;S.pwMsg=null;S.invMsg=null;render();if(S.sb){const before=JSON.stringify(S.team);loadTeam().then(()=>{if(S.view==='konto'&&JSON.stringify(S.team)!==before)render();}).catch(()=>{});}});
+document.getElementById('navKonto').addEventListener('click',()=>{S.view='konto';S.confirm=null;S.pwMsg=null;S.pwOpen=false;S.invMsg=null;render();if(S.sb){const before=JSON.stringify(S.team);loadTeam().then(()=>{if(S.view==='konto'&&JSON.stringify(S.team)!==before)render();}).catch(()=>{});}});
 
 render();
 /* ---------- Supabase-Anbindung ---------- */
