@@ -982,8 +982,8 @@ function viewKonto(){
           h('button',{type:'button',class:'btn danger',onclick:async()=>{try{await callFn('team',{action:'remove',email:m.email});S.confirm=null;await loadTeam();toast('Zugang entfernt');}catch(e){toast(e.message);}render();}},'Entfernen'),
           h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen')));
       }else{
-        row.append(h('button',{type:'button',class:'btn',onclick:async e=>{const b=e.currentTarget;b.disabled=true;try{await callFn('team',{action:'invite',email:m.email});toast('Einladung erneut gesendet');}catch(err){toast(err.message);}finally{b.disabled=false;}}},'Link erneut senden'),
-          h('button',{type:'button',class:'btn danger',onclick:()=>{S.confirm='rm:'+m.email;render();}},'Entfernen'));
+        row.append(h('div',{class:'row',style:'gap:8px;flex-wrap:nowrap'},h('button',{type:'button',class:'btn',style:'padding:0 14px;min-height:40px;font-size:14px',onclick:async e=>{const b=e.currentTarget;b.disabled=true;try{await callFn('team',{action:'invite',email:m.email});toast('Link erneut gesendet');}catch(err){toast(err.message);}finally{b.disabled=false;}}},'Link erneut senden'),
+          h('button',{type:'button',class:'btn danger',style:'padding:0 14px;min-height:40px;font-size:14px',onclick:()=>{S.confirm='rm:'+m.email;render();}},'Entfernen')));
       }
     }
     team.append(row);
