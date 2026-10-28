@@ -386,7 +386,7 @@ function viewUnterschrift(c){
     e.target.disabled=true;
     const name=document.getElementById('sg-name').value.trim(),ort=document.getElementById('sg-ort').value.trim();
     const kc=S.pads.kunde.cv,oc=S.pads.onlion.cv;
-    const kunde={name,img:kc.toDataURL('image/png'),ratio:kc.height/kc.width},onlion={name:'Adam Cebulla, ONLION',img:oc.toDataURL('image/png'),ratio:oc.height/oc.width};
+    const kunde={name,img:kc.toDataURL('image/png'),ratio:kc.height/kc.width},onlion={name:'ONLION',img:oc.toDataURL('image/png'),ratio:oc.height/oc.width};
     await flushAll();
     const fresh=cur()||c;
     const signedAt=new Date().toISOString();
@@ -402,7 +402,7 @@ function viewUnterschrift(c){
       h('div',{class:'field'},h('label',{for:'sg-ort'},'Ort'),h('input',{type:'text',id:'sg-ort',value:'',oninput:checkSign}))),
     h('div',{class:'grid2'},
       h('div',{class:'card'},h('div',{class:'label'},'Unterschrift Kunde'),makePad('kunde')),
-      h('div',{class:'card'},h('div',{class:'label'},'Unterschrift ONLION · Adam Cebulla'),makePad('onlion'))),
+      h('div',{class:'card'},h('div',{class:'label'},'Unterschrift ONLION'),makePad('onlion'))),
     h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>{S.view='datenschutz';render();}},'Zurück'),h('div',{class:'spacer'}),signBtn)];
 }
 
@@ -447,7 +447,7 @@ async function buildPdf(c){
     para('Prüfsumme SHA-256: '+sg.hash,7.5,'normal',1);
   } else para('Noch nicht unterschrieben.',10);
   const pages=doc.getNumberOfPages();
-  for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFontSize(7.5);doc.setTextColor(120);doc.text(clean('ONLION · Adam Cebulla · Rechtstexte: Entwurf, vor Einsatz prüfen lassen'),M,290);doc.text('Seite '+i+' von '+pages,W-M,290,{align:'right'});}
+  for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFontSize(7.5);doc.setTextColor(120);doc.text(clean('ONLION · Rechtstexte: Entwurf, vor Einsatz prüfen lassen'),M,290);doc.text('Seite '+i+' von '+pages,W-M,290,{align:'right'});}
   return doc.output('blob');
 }
 function viewPdf(c){
