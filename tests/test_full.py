@@ -90,10 +90,11 @@ try:
         page.fill('#m-to','kunde@bank.de'); page.click('button:has-text("PDF erstellen und senden")'); page.wait_for_selector('text=Zuletzt gesendet am')
         ok('E-Mail-Versand mit Login-Token', any('send-pdf' in u and a=='Bearer tok' and 'JVBER' in (d or '') for u,a,d in fncalls))
         page.click('nav >> text=Angebot'); page.wait_for_selector('text=Positionen')
-        page.click('.chip:has-text("Pilot KI-Telefon-Agent")'); page.wait_for_selector('#o-p-0')
-        ok('Summen (%s)' % page.inner_text('.totals').replace(chr(10),' '), '11.305,00' in page.inner_text('.totals'))
+        page.click('.chip:has-text("1–49 Mitarbeitende")'); page.wait_for_selector('#o-p-0')
+        ok('Summen (%s)' % page.inner_text('.totals').replace(chr(10),' '), '3.510,50' in page.inner_text('.totals'))
+        ok('Alte Bausteine entfernt', page.query_selector('.chip:has-text("Pilot")') is None and page.query_selector('.chip:has-text("Potenzialanalyse")') is None)
         page.fill('#o-q-0','2'); page.wait_for_timeout(600)
-        ok('Menge rechnet live', '22.610,00' in page.inner_text('.totals'))
+        ok('Menge rechnet live', '6.485,50' in page.inner_text('.totals'))
         ok('Kein Lexware mehr sichtbar', 'Lexware' not in page.inner_text('body'))
         page.screenshot(path=T + '/d-angebot.png', full_page=True)
         page.click('#navTpl'); page.wait_for_selector('#tq-q01')
@@ -121,7 +122,7 @@ try:
             if name=='m-3-datenschutz':
                 mob.click('button.mobile-back'); mob.click('.stage:has-text("Datenschutz")')
             elif name=='m-5-angebot':
-                mob.click('button.mobile-back'); mob.click('.stage:has-text("Angebot")'); mob.click('.chip:has-text("Potenzialanalyse")'); mob.wait_for_selector('#o-p-0')
+                mob.click('button.mobile-back'); mob.click('.stage:has-text("Angebot")'); mob.click('.chip:has-text("50–249 Mitarbeitende")'); mob.wait_for_selector('#o-p-0')
             elif name=='m-4-unterschrift':
                 mob.click('button.mobile-back'); mob.click('.stage:has-text("Unterschrift")')
             elif action: mob.click(action)
@@ -154,7 +155,7 @@ try:
         page.click('#navDash'); page.wait_for_selector('.kpis')
         kp = page.inner_text('.kpis')
         ok('Dashboard: 2 Kunden, 1 abgeschlossen', 'Kunden gesamt\n2' in kp and 'Abgeschlossen\n1' in kp)
-        ok('Dashboard: Umsatz netto aus Angebot', '19.000' in kp)
+        ok('Dashboard: Umsatz netto aus Angebot', '5.450' in kp)
         ok('Dashboard: Termin und überfällige Wiedervorlage', 'Lead AG' in page.inner_text('.cols2') and 'Überfällig' in page.inner_text('.cols2'))
         ok('Trichter', 'Termin vereinbart' in page.inner_text('.funnel'))
         page.screenshot(path=T + '/c-dashboard.png', full_page=True)

@@ -93,7 +93,7 @@ Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist.
 - **Datenschutz & AVV:** links die Angaben, rechts die Live-Vorschau der Rechtstexte.
 - **Unterschrift:** Kunde und ONLION unterschreiben. Danach ist die Akte gesperrt. Ändern geht nur über **Neue Version starten**.
 - **PDF:** Zusammenfassung mit Logo, Antworten, AVV, Unterschriften und Prüfsumme. Direkt per E-Mail an den Kunden senden, mit Kopie an dich, oder nur speichern.
-- **Angebot:** Positionen aus Bausteinen wählen (Potenzialanalyse, Pilot, Betrieb) oder frei anlegen, Preise anpassen, Summen mit 19 % USt sehen. Das verbindliche Angebot und die Rechnung erstellst du in deinem Buchhaltungsprogramm.
+- **Angebot:** Preisstaffel nach Firmengröße wählen (Einrichtung + monatliche Lizenz) oder Positionen frei anlegen, Preise anpassen, Summen mit 19 % USt sehen. Das verbindliche Angebot und die Rechnung erstellst du in deinem Buchhaltungsprogramm.
 - **Gesprächsfortschritt:** Prozentbalken über Stammdaten, Fragen und Datenschutz-Pflichtangaben. Offene ★-Fragen werden einzeln genannt.
 - **Vorlagen & Rechtstexte:** Fragen und Texte bearbeiten. Die Änderungen gelten für alle Kunden.
 - **Vertrieb (CRM)** oben in jeder Kundenakte: Status *Neu → Angerufen → Termin vereinbart → Unterschrieben → Abgeschlossen* oder *Verloren*, Termin, Wiedervorlage, Quelle und Gesprächsprotokoll. „Unterschrieben“ setzt die App automatisch bei der Unterschrift; ein Anruf-Eintrag setzt „Angerufen“, ein Termin-Datum „Termin vereinbart“. Jeder Statuswechsel wird mit Zeit gespeichert.
@@ -114,7 +114,7 @@ Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist.
 - Ein Backup ist im Free-Tarif von Supabase nicht automatisch enthalten. Für den Dauerbetrieb lohnt sich der Pro-Tarif.
 
 - Mit **Brevo** ebenfalls einen Auftragsverarbeitungsvertrag abschließen.
-- Die Preise in den Bausteinen sind Startwerte. Pro Kunde lassen sie sich anpassen.
+- Die Preisstaffeln pflegst du unter Vertrieb → Provisionsmodell. Pro Kunde lassen sich die Preise im Angebot anpassen.
 
 ## Aufbau
 - `index.html`: die App. Sie läuft im Browser und braucht keinen Build-Schritt.

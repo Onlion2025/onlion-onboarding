@@ -789,8 +789,8 @@ function viewAngebot(c){
   return [h('div',null,h('div',{class:'eyebrow'},c.firma+' · KI-Telefon-Agent'),h('h1',null,'Angebot')),
     h('section',{class:'card'},h('h2',null,'Positionen'),
       staffelChips(c,items,st=>{const keep=items.filter(i=>i.kind!=='einrichtung'&&i.kind!=='lizenz');const n=staffelItems(st).concat(keep);saveCust(c.id,{offer:{items:n,staffel:st.id}},0);toast(st.individuell?'Preis bitte eintragen':'Staffel übernommen');render._force=true;render();}),
-      items.length?rows:h('div',{class:'eyebrow'},'Noch keine Positionen. Mit den Bausteinen unten starten.'),
-      h('div',{class:'chips'},...PRESETS.map(p=>h('button',{type:'button',class:'chip',onclick:()=>addPreset(p)},'+ '+p.name)),h('button',{type:'button',class:'chip',onclick:()=>addPreset({name:'Neue Position',qty:1,unit:'Stück',price:0})},'+ Freie Position')),
+      items.length?rows:h('div',{class:'eyebrow'},'Noch keine Positionen. Oben die Preisstaffel nach Firmengröße wählen.'),
+      h('div',{class:'chips'},h('button',{type:'button',class:'chip',onclick:()=>addPreset({name:'Neue Position',qty:1,unit:'Stück',price:0})},'+ Freie Position')),
       totals,
       h('div',{class:'eyebrow'},'Kalkulation für das Gespräch. Das verbindliche Angebot und die Rechnung erstellst du später in deinem Buchhaltungsprogramm.'))];
 }
@@ -890,8 +890,8 @@ function viewDashboard(){
     kpi('Kunden gesamt',String(n),newM+' neu in diesem Monat'),
     kpi('Abgeschlossen',String(won.length),n?Math.round(won.length/n*100)+' % aller Kunden':'noch keine Kunden',true),
     kpi('Abschlussquote',decided?Math.round(won.length/decided*100)+' %':'–',decided?'von '+decided+' entschiedenen':'noch nichts entschieden'),
-    kpi('Angebote offen',eur0(openVal),'netto, laufende Kunden'),
-    kpi('Umsatz abgeschlossen',eur0(wonVal),'netto, laut Angebot'),
+    kpi('Angebote offen',eur0(openVal),'netto, Einrichtung + 1. Monat Lizenz'),
+    kpi('Umsatz abgeschlossen',eur0(wonVal),'netto, Einrichtung + 1. Monat Lizenz'),
     kpi('Termine in 7 Tagen',String(cs.filter(c=>{const t=(crmOf(c).termin||'').slice(0,10);return t&&t>=today&&t<=in7;}).length),'ab heute'));
   // Pipeline-Kacheln mit Filter
   const f=S.dashFilter||'';
