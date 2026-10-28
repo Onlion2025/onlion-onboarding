@@ -4,3 +4,5 @@
 - `node test_functions.js` – Netlify Functions send-pdf, team und reset-password mit nachgebautem fetch.
 - `python3 pdf_sample.py` – erzeugt sample.pdf mit Testdaten zur Sichtprüfung des PDF-Layouts.
 - Startdaten liegen als seed_*.json hier. Der App-Pfad (APP=…) steht oben in den Skripten.
+- `python3 test_vertrieb.py` – Vertrieb: Provisionsmodell, Zahlungen, Provisionen, Gutschriften, Partner-Ansicht (40 Prüfungen).
+- `node test_rls.mjs` – Zugriffsregeln gegen echtes Postgres (PGlite, `npm i --no-save @electric-sql/pglite`), 28 Prüfungen.

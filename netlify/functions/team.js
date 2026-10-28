@@ -18,13 +18,22 @@ exports.handler = async (event) => {
   if (b.action === 'invite') {
     // 1) In die Team-Liste eintragen (vorhandene Einträge bleiben, Rolle wird nicht verändert)
     const existing = await teamRow(email);
+    const role = b.role === 'partner' ? 'partner' : 'member';
+    let sponsor = null;
+    if (role === 'partner' && b.sponsor) {
+      sponsor = lc(b.sponsor);
+      const sp = await teamRow(sponsor);
+      if (!sp || sp.role !== 'partner' || sponsor === email) return json(400, { error: 'Der gewählte Werber ist kein Vertriebspartner.' });
+    }
     if (!existing) {
+      const row = { email, role };
+      if (role === 'partner') { row.sponsor = sponsor; if (b.name) row.name = String(b.name).slice(0, 120); }
       const ins = await admin('/rest/v1/team', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ email, role: 'member' })
+        body: JSON.stringify(row)
       });
-      if (!ins.ok) return json(502, { error: 'Eintrag in die Team-Liste fehlgeschlagen. Wurde supabase/team.sql ausgeführt?' });
+      if (!ins.ok) return json(502, { error: role === 'partner' ? 'Eintrag fehlgeschlagen. Wurde supabase/vertrieb.sql ausgeführt?' : 'Eintrag in die Team-Liste fehlgeschlagen. Wurde supabase/team.sql ausgeführt?' });
     }
     // 2) Einladungslink erzeugen; gibt es das Konto schon, einen Passwort-Link
     let link = await makeLink('invite', email);
@@ -42,7 +51,9 @@ exports.handler = async (event) => {
         'Hallo,\nhier ist ein neuer Link für deinen Zugang zur ONLION Onboarding-App. Über den Button legst du ein neues Passwort fest und bist danach angemeldet.',
         'Neues Passwort festlegen', link.link)
       : await sendLinkMail(email, 'Einladung zur ONLION Onboarding-App',
-        'Hallo,\ndu wurdest zur ONLION Onboarding-App für den KI-Telefon-Agenten eingeladen. Über den Button legst du dein eigenes Passwort fest und bist danach angemeldet.',
+        (existing ? existing.role : role) === 'partner'
+          ? 'Hallo,\ndu wurdest als Vertriebspartner zur ONLION Onboarding-App eingeladen. Dort legst du deine Kunden an, führst das Onboarding für den KI-Telefon-Agenten durch und siehst deine Provisionen. Über den Button legst du dein eigenes Passwort fest.'
+          : 'Hallo,\ndu wurdest zur ONLION Onboarding-App für den KI-Telefon-Agenten eingeladen. Über den Button legst du dein eigenes Passwort fest und bist danach angemeldet.',
         'Passwort festlegen', link.link);
     if (!mail.ok) return json(502, { error: 'Eingetragen, aber die E-Mail wurde nicht versendet: ' + mail.message });
     return json(200, { ok: true });

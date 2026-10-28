@@ -74,6 +74,11 @@ In Netlify unter **Site configuration → Environment variables** diese Werte an
 
 Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist. Die Schlüssel verlassen den Server nie.
 
+### Update: Vertriebspartner und Provisionen (Oktober 2026)
+1. In Supabase `supabase/vertrieb.sql` ausführen (nach `team.sql`). Kontrolle am Ende: 6 Policies auf `docs`, 3 auf `team`.
+2. In der App unter **Vertrieb → Provisionsmodell** die Absenderdaten für Gutschriften eintragen (Anschrift, Steuer-Nr./USt-ID).
+3. Erst Partner einladen, wenn der Partnervertrag unterschrieben ist.
+
 ### Update einer bestehenden Installation (Team-Zugang, Oktober 2026)
 1. In Supabase `supabase/team.sql` ausführen (E-Mail in der Insert-Zeile vorher prüfen).
 2. In Supabase die **Site URL** setzen (siehe Schritt 2.3), optional die Link-Gültigkeit erhöhen (2.4).
@@ -93,6 +98,13 @@ Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist.
 - **Vorlagen & Rechtstexte:** Fragen und Texte bearbeiten. Die Änderungen gelten für alle Kunden.
 - **Vertrieb (CRM)** oben in jeder Kundenakte: Status *Neu → Angerufen → Termin vereinbart → Unterschrieben → Abgeschlossen* oder *Verloren*, Termin, Wiedervorlage, Quelle und Gesprächsprotokoll. „Unterschrieben“ setzt die App automatisch bei der Unterschrift; ein Anruf-Eintrag setzt „Angerufen“, ein Termin-Datum „Termin vereinbart“. Jeder Statuswechsel wird mit Zeit gespeichert.
 - **Dashboard:** Kunden gesamt, Abschlüsse, Abschlussquote, offene und abgeschlossene Angebotssummen (netto), Anzahl je Status mit Filter, Trichter vom Kontakt zum Abschluss, nächste Termine, fällige Wiedervorlagen und Kundenliste. Es braucht keine Einrichtung; die Zahlen kommen aus den Kundenakten.
+- **Vertrieb (nur ONLION):**
+  - *Partner:* Partner einladen (mit „geworben von“), Partnerbaum, Anschrift, Steuerstatus (Kleinunternehmer), Status aktiv/inaktiv, Sonderkondition je Partner, Vorschläge von Partnern übernehmen.
+  - *Provisionsmodell:* Prozente für Verkäufer, Ebene 1 und Ebene 2 auf Einrichtung und Lizenz, Laufzeit der Lizenzprovision und die Aktivitätsbedingung als Entwurf ändern und „ab Datum“ freigeben. Jede Version bleibt gespeichert; jede Provision merkt sich ihre Version. Dazu Preisstaffeln und Absender der Gutschriften.
+  - *Zahlungen:* Lizenzmonat für alle abgeschlossenen Kunden auf einmal verbuchen; Einzelzahlungen und Storno in der Kundenakte.
+  - *Abrechnung:* je Monat eine Gutschrift (PDF) je Partner, mit 19 % USt oder ohne bei Kleinunternehmern; danach „ausgezahlt“ markieren. Storno nach Auszahlung wird als Rückforderung auf die nächste Gutschrift gebucht.
+- **Provisionen werden nur aus verbuchten Zahlungseingängen berechnet**, nie fürs Anwerben. Anteile aus Ebene 1 und 2 nur bei eigenem bezahlten Abschluss im laufenden oder vorigen Quartal (einstellbar).
+- **Vertriebspartner** sehen nur ihre eigenen Kunden (die sie anlegen oder die ihnen zugeordnet sind), ihre Konditionen, ihr Provisionskonto, ihre Gutschriften und die Namen ihrer Struktur. Keine Zahlungen, keine fremden Kunden, keine Vorlagen-Bearbeitung. Das sichert die Datenbank ab (`supabase/vertrieb.sql`).
 - **Konto & Team:** eigenes Passwort ändern (mit aktuellem Passwort bestätigt). Als Inhaber Personen per E-Mail einladen, den Link erneut senden oder den Zugang entfernen. Eingeladene legen ihr Passwort über den Link selbst fest und sehen alle Kunden.
 - **Passwort vergessen?** auf der Anmeldeseite schickt einen Link zum Neusetzen, aber nur an Adressen aus dem Team.
 
@@ -110,6 +122,7 @@ Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist.
 - `netlify/functions/team.js`: Einladen und Entfernen (nur Inhaber)
 - `netlify/functions/reset-password.js`: Link für „Passwort vergessen?“
 - `supabase/team.sql`: Team-Liste und Zugriffsschutz
+- `supabase/vertrieb.sql`: Rollen ONLION/Partner, Partnerdaten, Zugriffsregeln je Partner, Struktur-Abfrage
 - `supabase/schema.sql`: Datenbank, Zugriffsschutz und Startdaten
 - `sw.js`, `manifest.webmanifest`, `icon-*.png`: Installation als App
 

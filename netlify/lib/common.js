@@ -20,7 +20,7 @@ function admin(path, opts = {}) {
 
 // Liest einen Team-Eintrag (Server-Sicht).
 async function teamRow(email) {
-  const r = await admin('/rest/v1/team?select=email,role,user_id,last_reset&email=eq.' + encodeURIComponent(lc(email)));
+  const r = await admin('/rest/v1/team?select=*&email=eq.' + encodeURIComponent(lc(email)));
   if (!r.ok) return null;
   const rows = await r.json().catch(() => []);
   return Array.isArray(rows) && rows[0] ? rows[0] : null;
@@ -44,7 +44,8 @@ async function requireUser(event) {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
   const row = await teamRow(email).catch(() => null);
   if (!row) return null;
-  return Object.assign(user, { role: row.role === 'owner' ? 'owner' : 'member' });
+  if (row.role === 'partner' && row.status && row.status !== 'aktiv') return null;
+  return Object.assign(user, { role: ['owner', 'member', 'partner'].includes(row.role) ? row.role : 'member' });
 }
 
 // Erzeugt einen Einladungs- oder Passwort-Link (Supabase) und gibt ihn zurück.

@@ -2,16 +2,21 @@
 (function(){
   const rows = new Map(); // key collection/id -> {collection,id,data}
   window.__rows = rows;
-  window.__team = [{email:'adam@test.de', role:'owner'}, {email:'a@b.de', role:'member'}];
+  window.__team = window.__teamInit || [{email:'adam@test.de', role:'owner'}, {email:'a@b.de', role:'member'}];
+  for (const r of (window.__seedRows || [])) rows.set(r.collection + '/' + r.id, r);
   window.__pw = 'richtig';
   function q(table){
     if (table === 'team') {
-      // RLS nachgebaut: nur Team-Mitglieder sehen die Team-Liste
-      const api = { select(){ return api; }, then(res, rej){
+      // RLS nachgebaut: ONLION sieht alle, Partner nur sich, Fremde nichts
+      const tf = {}; let patch = null;
+      const api = { select(){ return api; }, eq(k, v){ tf[k] = v; return api; }, update(p){ patch = p; return api; }, then(res, rej){
         if (window.__teamBroken) return Promise.resolve({data: null, error: {message: 'relation "public.team" does not exist'}}).then(res, rej);
         const me = session && String(session.user.email).toLowerCase();
-        const vis = window.__team.some(m => m.email === me) ? JSON.parse(JSON.stringify(window.__team)) : [];
-        return Promise.resolve({data: vis, error: null}).then(res, rej);
+        const mine = window.__team.find(m => m.email === me);
+        const admin = mine && mine.role !== 'partner';
+        if (patch) { if (!admin) return Promise.resolve({data: null, error: {message: 'denied'}}).then(res, rej); for (const m of window.__team) if (Object.keys(tf).every(k => m[k] === tf[k])) Object.assign(m, JSON.parse(JSON.stringify(patch))); return Promise.resolve({data: null, error: null}).then(res, rej); }
+        const vis = !mine ? [] : admin ? window.__team : window.__team.filter(m => m.email === me);
+        return Promise.resolve({data: JSON.parse(JSON.stringify(vis)), error: null}).then(res, rej);
       } };
       return api;
     }
@@ -30,9 +35,15 @@
     async function run(single){
       await new Promise(r => setTimeout(r, 5));
       if (mode === 'update'){ if (window.__raceOnce){ const fn = window.__raceOnce; window.__raceOnce = null; fn(); } const hit = [...rows.values()].filter(r => Object.keys(f).every(k => (r[k] ?? null) === (f[k] ?? null))); for (const r of hit) Object.assign(r, JSON.parse(JSON.stringify(payload))); return {data: hit.map(r => ({id: r.id})), error: null}; }
-      if (mode === 'upsert'){ rows.set(payload.collection + '/' + payload.id, JSON.parse(JSON.stringify(payload))); return {error:null}; }
+      if (mode === 'upsert'){ for (const p of [].concat(payload)) rows.set(p.collection + '/' + p.id, JSON.parse(JSON.stringify(p))); return {error:null}; }
       if (mode === 'delete'){ for (const [k, r] of rows) if (match(r)) rows.delete(k); return {error:null}; }
-      const list = [...rows.values()].filter(match).map(r => JSON.parse(JSON.stringify(r)));
+      const me = session && String(session.user.email).toLowerCase();
+      const mine = (window.__team || []).find(m => m.email === me);
+      const partnerView = r => !mine || mine.role !== 'partner' ? true :
+        ['templates','legal','config'].includes(r.collection) ? true :
+        ['customers','provisionen','gutschriften'].includes(r.collection) ? (r.data && r.data.partner === me) :
+        r.collection === 'vorschlaege' ? (r.data && r.data.von === me) : false;
+      const list = [...rows.values()].filter(match).filter(partnerView).map(r => JSON.parse(JSON.stringify(r)));
       if (single) return {data: list[0] || null, error: null};
       return {data: list, error: null};
     }
@@ -46,6 +57,7 @@
   if (hp.get('access_token')) { session = {user:{email: hp.get('mock_email')}, access_token: 'tok'}; keep(); }
   window.supabase = { createClient(){ return {
     from: q,
+    rpc(name){ return Promise.resolve({data: name === 'my_structure' ? (window.__struct || []) : null, error: null}); },
     channel(){ return { on(){ return this; }, subscribe(){ return this; } }; },
     auth: {
       async getSession(){ return {data:{session}}; },

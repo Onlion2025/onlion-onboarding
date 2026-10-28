@@ -1,0 +1,77 @@
+import { PGlite } from '@electric-sql/pglite';
+import fs from 'fs';
+const R = new URL('../supabase/', import.meta.url).pathname;
+const db = new PGlite();
+const ex = s => db.exec(s);
+await ex(`create role authenticated; create schema auth;
+create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true),''),'{}')::jsonb $$;
+grant usage on schema auth to authenticated; grant execute on function auth.jwt() to authenticated;
+create table public.docs (collection text not null, id text not null, data jsonb not null default '{}'::jsonb, updated_at timestamptz not null default now(), primary key (collection,id));
+alter table public.docs enable row level security;
+grant select, insert, update, delete on public.docs to authenticated;`);
+await ex(fs.readFileSync(R + 'team.sql', 'utf8'));
+await ex(`grant select, update on public.team to authenticated;`);
+const v = await db.exec(fs.readFileSync(R + 'vertrieb.sql', 'utf8'));
+console.log('Policies:', v.at(-1).rows.map(r => r.tablename + ':' + r.policyname).join(' | '));
+// Daten
+await ex(`insert into team(email,role) values ('marc@x.de','member');
+insert into team(email,role,sponsor,name) values ('p1@x.de','partner',null,'P1'),('p2@x.de','partner','p1@x.de','P2'),('p3@x.de','partner','p2@x.de','P3'),('p4@x.de','partner','p3@x.de','P4');
+insert into team(email,role,status) values ('weg@x.de','partner','inaktiv');
+insert into docs values ('customers','a','{"firma":"A","partner":"p1@x.de"}'),('customers','b','{"firma":"B","partner":"p2@x.de"}'),('customers','c','{"firma":"C"}'),
+ ('templates','t','{}'),('legal','l','{}'),('config','provision','{}'),('zahlungen','z1','{"partner":"p1@x.de"}'),
+ ('provisionen','r1','{"partner":"p1@x.de"}'),('provisionen','r2','{"partner":"p2@x.de"}'),('gutschriften','g1','{"partner":"p1@x.de"}');`);
+let pass = 0, fail = 0;
+const ok = (n, c) => { console.log((c ? 'OK   ' : 'FAIL ') + n); c ? pass++ : fail++; };
+async function as(email, fn) {
+  await ex(`reset role; select set_config('request.jwt.claims', '${JSON.stringify({ email })}', false); set role authenticated;`);
+  try { return await fn(); } finally { await ex('reset role'); }
+}
+const q = async s => (await db.query(s)).rows;
+const tryq = async s => { try { await db.query(s); return true; } catch (e) { return false; } };
+
+await as('onlion-@outlook.de', async () => {
+  ok('Inhaber sieht alle Kunden', (await q(`select id from docs where collection='customers'`)).length === 3);
+  ok('Inhaber sieht Zahlungen', (await q(`select id from docs where collection='zahlungen'`)).length === 1);
+  ok('Inhaber sieht ganze Team-Liste', (await q(`select email from team`)).length === 7);
+  ok('Inhaber kann Partner ändern', await tryq(`update team set name='Neu' where email='p1@x.de'`));
+});
+await as('marc@x.de', async () => {
+  ok('Team-Mitglied (Admin) sieht alle Kunden', (await q(`select id from docs where collection='customers'`)).length === 3);
+});
+await as('p1@x.de', async () => {
+  const c = await q(`select id from docs where collection='customers'`);
+  ok('Partner sieht nur eigenen Kunden', c.length === 1 && c[0].id === 'a');
+  ok('Partner sieht keine Zahlungen', (await q(`select id from docs where collection='zahlungen'`)).length === 0);
+  const p = await q(`select id from docs where collection in ('provisionen','gutschriften')`);
+  ok('Partner sieht nur eigene Provisionen/Gutschriften', p.length === 2 && p.every(r => ['r1', 'g1'].includes(r.id)));
+  ok('Partner liest Vorlagen/Rechtstexte/Modell', (await q(`select id from docs where collection in ('templates','legal','config')`)).length === 3);
+  ok('Partner kann eigenen Kunden anlegen', await tryq(`insert into docs values ('customers','neu','{"firma":"N","partner":"p1@x.de"}')`));
+  ok('Partner kann keinen Kunden für andere anlegen', !(await tryq(`insert into docs values ('customers','x','{"firma":"X","partner":"p2@x.de"}')`)));
+  ok('Partner kann fremden Kunden nicht übernehmen', (await q(`update docs set data='{"partner":"p1@x.de"}' where id='b' returning id`)).length === 0);
+  ok('Partner kann eigenen Kunden nicht weggeben', !(await tryq(`update docs set data='{"firma":"A","partner":"p2@x.de"}' where id='a'`)));
+  ok('Partner kann keine Provision anlegen', !(await tryq(`insert into docs values ('provisionen','fake','{"partner":"p1@x.de"}')`)));
+  ok('Partner kann Provision nicht ändern', (await q(`update docs set data='{"partner":"p1@x.de","betrag":99999}' where id='r1' returning id`)).length === 0);
+  ok('Partner kann Modell nicht ändern', (await q(`update docs set data='{"x":1}' where collection='config' returning id`)).length === 0);
+  ok('Partner kann Vorlage nicht ändern', (await q(`update docs set data='{"x":1}' where collection='templates' returning id`)).length === 0);
+  ok('Partner kann Vorschlag anlegen', await tryq(`insert into docs values ('vorschlaege','v1','{"von":"p1@x.de","email":"neu@x.de"}')`));
+  ok('Partner kann keinen Vorschlag im fremden Namen anlegen', !(await tryq(`insert into docs values ('vorschlaege','v2','{"von":"p2@x.de"}')`)));
+  const t = await q(`select email from team`);
+  ok('Partner sieht in der Team-Liste nur sich', t.length === 1 && t[0].email === 'p1@x.de');
+  ok('Partner kann sich nicht zum Admin machen', (await q(`update team set role='owner' where email='p1@x.de' returning email`)).length === 0);
+  const s = await q(`select email, ebene from my_structure() order by ebene`);
+  ok('Struktur zeigt 2 Ebenen (' + s.map(r => r.email + ':' + r.ebene).join(',') + ')', s.length === 2 && s[0].email === 'p2@x.de' && s[0].ebene === 1 && s[1].email === 'p3@x.de' && s[1].ebene === 2);
+  ok('Partner ist kein Admin', (await q(`select public.is_admin() a`))[0].a === false);
+});
+await as('weg@x.de', async () => {
+  ok('Inaktiver Partner sieht nichts', (await q(`select id from docs`)).length === 0);
+});
+await as('fremd@x.de', async () => {
+  ok('Fremdes Konto sieht nichts', (await q(`select id from docs`)).length === 0 && (await q(`select email from team`)).length === 0);
+  ok('Fremdes Konto: Struktur leer', (await q(`select * from my_structure()`)).length === 0);
+});
+// Zyklus-Schutz: sponsor kann nicht man selbst sein
+ok('Partner kann nicht sein eigener Werber sein', !(await tryq(`update team set sponsor='p1@x.de' where email='p1@x.de'`)));
+// SQL zweimal ausführbar
+ok('vertrieb.sql mehrfach ausführbar', await db.exec(fs.readFileSync(R + 'vertrieb.sql', 'utf8')).then(() => true, e => (console.log(e.message), false)));
+console.log(`\n${pass}/${pass + fail} Zugriffstests bestanden`);
+process.exit(fail ? 1 : 0);

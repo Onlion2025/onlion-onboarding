@@ -84,5 +84,18 @@ let pass = 0; const ok = (n, c) => { assert.ok(c, n); pass++; console.log('OK   
   calls = []; const r2 = await resetFn({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ email: 'unbekannt@x.de' }) });
   ok('Reset für Unbekannte: gleiche Antwort, keine Mail', r2.statusCode === 200 && r2.body === r.body && !calls.some(c => c.url.includes('brevo')));
 
+
+  // Vertriebspartner
+  team.push({ email: 'vp1@x.de', role: 'partner', status: 'aktiv', user_id: null }, { email: 'vpweg@x.de', role: 'partner', status: 'inaktiv', user_id: null });
+  userMail = 'vp1@x.de'; r = await send(ev({ to: 'a@b.de', pdfBase64: 'x' })); ok('Aktiver Partner darf PDF senden', r.statusCode === 200);
+  r = await teamFn(ev({ action: 'invite', email: 'neu2@x.de' })); ok('Partner darf nicht einladen', r.statusCode === 403);
+  userMail = 'vpweg@x.de'; r = await send(ev({ to: 'a@b.de', pdfBase64: 'x' })); ok('Inaktiver Partner 401', r.statusCode === 401);
+  userMail = 'adam@onlion.de'; calls = [];
+  r = await teamFn(ev({ action: 'invite', email: 'vp2@x.de', role: 'partner', sponsor: 'vp1@x.de', name: 'Vera' }));
+  ok('Partner mit Werber einladen', r.statusCode === 200 && team.some(t => t.email === 'vp2@x.de' && t.role === 'partner' && t.sponsor === 'vp1@x.de' && t.name === 'Vera'));
+  ok('Partner-Einladung mit Partner-Text', JSON.parse(calls.find(c => c.url.includes('brevo')).opts.body).htmlContent.includes('Vertriebspartner'));
+  r = await teamFn(ev({ action: 'invite', email: 'vp3@x.de', role: 'partner', sponsor: 'partner@x.de' })); ok('Werber muss Partner sein', r.statusCode === 400);
+  r = await teamFn(ev({ action: 'invite', email: 'admin2@x.de', role: 'owner' })); ok('Rolle owner nicht vergebbar', r.statusCode === 200 && team.find(t => t.email === 'admin2@x.de').role === 'member');
+
   console.log('\n' + pass + ' Funktionstests bestanden');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });
