@@ -733,7 +733,9 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.s
   },e=>{S.loaded=true;toast('Kunden konnten nicht geladen werden.');render();});
   db.doc('templates/'+TPL_ID).onSnapshot(s=>{
     const a=document.activeElement;if(S.view==='vorlagen'&&a&&a.closest&&a.closest('#view'))return;
-    S.tpl=s.exists?JSON.parse(JSON.stringify(s.data())):null;if(S.tpl&&S.tpl.name)document.getElementById('prodName').textContent=S.tpl.product||'KI-Telefon-Agent';
+    S.tpl=s.exists?JSON.parse(JSON.stringify(s.data())):null;
+    if(S.tpl&&JSON.stringify(S.tpl).includes('mehr Finanzierungs-Leads?')){S.tpl=JSON.parse(JSON.stringify(S.tpl).split('mehr Finanzierungs-Leads?').join('mehr Käufer- und Verkäufer-Leads?'));db.doc('templates/'+TPL_ID).set(S.tpl).catch(()=>{});}
+    if(S.tpl&&S.tpl.name)document.getElementById('prodName').textContent=S.tpl.product||'KI-Telefon-Agent';
     if(S.view==='unterschrift'&&!signed(cur())){renderSide();return;}render();});
   db.doc('legal/'+LEGAL_ID).onSnapshot(s=>{
     const a=document.activeElement;if(S.view==='vorlagen'&&a&&a.closest&&a.closest('#view'))return;
