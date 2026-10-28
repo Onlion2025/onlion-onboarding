@@ -1,0 +1,13 @@
+{
+  "draft": true,
+  "items": [
+    {
+      "title": "Vereinbarung zur Auftragsverarbeitung (Art. 28 DSGVO)",
+      "body": "zwischen\n{{firma}}, {{adresse}}, vertreten durch {{vertreter}} (Verantwortlicher)\nund\nONLION (Auftragsverarbeiter)\n\n§ 1 Gegenstand und Dauer\nDer Auftragsverarbeiter betreibt für den Verantwortlichen einen KI-Telefonassistenten, der eingehende Anrufe annimmt, Anliegen aufnimmt und an den Verantwortlichen weitergibt. Die Vereinbarung gilt für die Dauer des Hauptvertrags.\n\n§ 2 Art der Daten und betroffene Personen\nVerarbeitet werden Name, Telefonnummer, E-Mail-Adresse, Gesprächsinhalte und Anliegen von Anrufern (Interessenten, Kunden und sonstige Anrufer des Verantwortlichen).\n\n§ 3 Speicherung und Löschung\nGespräche werden wie folgt gespeichert: {{speicherung}}. Nach Ablauf der Frist oder Ende des Auftrags werden die Daten gelöscht oder zurückgegeben.\n\n§ 4 Weisungen und Vertraulichkeit\nDer Auftragsverarbeiter verarbeitet Daten nur auf dokumentierte Weisung des Verantwortlichen. Alle eingesetzten Personen sind zur Vertraulichkeit verpflichtet.\n\n§ 5 Technische und organisatorische Maßnahmen\nDer Auftragsverarbeiter trifft angemessene Maßnahmen nach Art. 32 DSGVO, insbesondere Zugangsschutz, Verschlüsselung der Übertragung und Verarbeitung in der Europäischen Union, soweit vereinbart.\n\n§ 6 Unterauftragsverarbeiter\nEingesetzt werden die Telefon- und KI-Plattform KI-Flow sowie die dort eingebundenen Sprach- und KI-Dienste. Die Liste ist dieser Vereinbarung als Anlage beigefügt. Neue Unterauftragsverarbeiter werden vorher mitgeteilt.\n\n§ 7 Unterstützung und Meldepflichten\nDer Auftragsverarbeiter unterstützt den Verantwortlichen bei Anfragen betroffener Personen und meldet Datenschutzverletzungen unverzüglich.\n\n§ 8 Kontrollrechte\nDer Verantwortliche kann sich von der Einhaltung dieser Vereinbarung überzeugen. Ansprechpartner Datenschutz beim Verantwortlichen: {{dsb}}.\n\nStand: {{datum}}"
+    },
+    {
+      "title": "Hinweis an Anrufer (KI und Datenschutz)",
+      "body": "Zu Beginn jedes Gesprächs sagt der Assistent, dass der Anrufer mit einer digitalen KI-Assistentin von {{firma}} spricht. Vor dem Aufnehmen von Kontaktdaten fragt der Assistent, ob die Angaben gespeichert werden dürfen. Speicherung: {{speicherung}}. Weitere Informationen erhalten Anrufer in der Datenschutzerklärung von {{firma}}."
+    }
+  ]
+}

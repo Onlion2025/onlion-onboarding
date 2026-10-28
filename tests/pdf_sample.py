@@ -2,7 +2,7 @@ import json, subprocess, time, sys, os, base64
 from playwright.sync_api import sync_playwright
 APP='/home/claude/onlion-onboarding'; T=os.path.dirname(os.path.abspath(__file__))
 srv=subprocess.Popen([sys.executable,'-m','http.server','8766','--directory',APP],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); time.sleep(1)
-tpl=json.load(open('/home/claude/onboarding/seed_template.json')); legal=json.load(open('/home/claude/onboarding/seed_legal.json'))
+tpl=json.load(open(''+T+'/seed_template.json')); legal=json.load(open(''+T+'/seed_legal.json'))
 ans={'q01':'Verpasste Anrufe','q02':'Termine','q03':'Keine Termine','q04':'50','q05':'10','q06':'Dienstag 9 bis 15 Uhr','q07':'Angestellte und wenn nicht dann geht auch keiner ran.','q08':'Termine, Fragen zu Öffnungszeiten und Preise zu Immobilien','q09':'Preise','q10':'Nur aufgenommen werden und in Einzelfällen auch gleich in den Termin eingetragen werden','q11':'Keine Ahnung','q12':'Ja an David','q13':'Nein','q15':'Oft','q16':'Nein','q17':'In einer E-Mail','q18':'Ja','q19':'Eigene Nummer','q20':'Lea','q21':'Nein','q22':'Nein','q23':'Ja','q24':'Ja','q25':'Ja','q26':'Herr Müller','q27':'600 EUR im Monat'}
 try:
   with sync_playwright() as p:

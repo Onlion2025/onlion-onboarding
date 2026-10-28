@@ -5,8 +5,8 @@ APP = '/home/claude/onlion-onboarding'
 T = os.path.dirname(os.path.abspath(__file__))
 srv = subprocess.Popen([sys.executable, '-m', 'http.server', '8765', '--directory', APP], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 time.sleep(1)
-tpl = json.load(open('/home/claude/onboarding/seed_template.json'))
-legal = json.load(open('/home/claude/onboarding/seed_legal.json'))
+tpl = json.load(open(''+T+'/seed_template.json'))
+legal = json.load(open(''+T+'/seed_legal.json'))
 results = []
 def ok(name, cond):
     results.append((name, bool(cond)))
