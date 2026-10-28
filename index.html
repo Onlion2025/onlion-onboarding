@@ -67,9 +67,13 @@ h2{margin:0;font-size:20px;font-weight:700;text-wrap:balance}
 .field label{font-size:13px;font-weight:600}
 .login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px;z-index:30}
 .login-card{width:min(420px,100%)}
-input[type=text],input[type=email],input[type=tel],input[type=password],input[type=number],input[type=date],input[type=datetime-local],textarea,select{background:var(--field);border:1px solid var(--line-strong);border-radius:10px;padding:11px 12px;min-height:44px;width:100%}
+input[type=text],input[type=email],input[type=tel],input[type=password],input[type=number],input[type=date],input[type=datetime-local],input[type=month],textarea,select{background:var(--field);border:1px solid var(--line-strong);border-radius:10px;padding:11px 12px;min-height:44px;width:100%}
 textarea{min-height:76px;resize:vertical}
 input:disabled,textarea:disabled,select:disabled{opacity:.6}
+/* iPhone/Safari: Datumsfelder wie alle anderen Felder, nicht breiter als der Rahmen */
+input[type=date],input[type=month],input[type=datetime-local]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;text-align:left;line-height:1.3}
+input[type=date]::-webkit-date-and-time-value,input[type=month]::-webkit-date-and-time-value,input[type=datetime-local]::-webkit-date-and-time-value{text-align:left;margin:0}
+.field>*{min-width:0;max-width:100%}
 .check{display:flex;gap:10px;align-items:flex-start;min-height:44px;padding-block:6px}
 .check input{width:20px;height:20px;margin-top:1px;accent-color:var(--accent-ink);flex:none}
 .stages{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;list-style:none;margin:0;padding:0}
@@ -165,6 +169,8 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
 .ctable tr.clk{cursor:pointer}.ctable tr.clk:hover td{background:var(--panel2)}
 .ctable .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 @media (max-width:760px){.ctable thead{display:none}.ctable tr{display:grid;grid-template-columns:minmax(0,1fr) auto;border-bottom:1px solid var(--line);padding:8px 0}.ctable td{border:0;padding:3px 4px}.ctable td.hide-m{display:none}}
+.m-only{display:none}
+@media (max-width:760px){.m-only{display:inline;color:var(--muted);font-size:12px}}
 .log{display:flex;flex-direction:column;gap:8px}
 .logi{border-left:3px solid var(--lime);padding:4px 0 4px 12px;font-size:14px}
 .logi .lm{font-size:12px;color:var(--muted)}
@@ -1312,7 +1318,7 @@ function vtZahlungen(){
   const zs=S.zahl.slice().sort((a,b)=>String(b.datum).localeCompare(String(a.datum))||String(b.at).localeCompare(String(a.at)));
   const tb=h('tbody');
   for(const z of zs.slice(0,300)){const pv=r2(S.prov.filter(p=>p.zahlungId===z.id&&p.status!=='storniert'&&!p.storno).reduce((s,p)=>s+p.betrag,0));
-    tb.append(h('tr',{class:'clk',onclick:()=>{S.curId=z.customerId;S.view='start';render();window.scrollTo(0,0);}},h('td',{class:'hide-m'},fmtDay(z.datum).replace(/^\w+\.,\s*/,'')),h('td',null,h('strong',null,z.firma||'–'),h('div',{class:'eyebrow'},(z.art==='einrichtung'?'Einrichtung':'Lizenz '+fmtMonth(z.monat))+(z.storniert?' · storniert':''))),h('td',{class:'hide-m'},z.partner?pname(z.partner):'Direkt'),h('td',{class:'num'},eur(z.netto)),h('td',{class:'num'},z.partner?eur(pv):'–')));}
+    tb.append(h('tr',{class:'clk',onclick:()=>{S.curId=z.customerId;S.view='start';render();window.scrollTo(0,0);}},h('td',{class:'hide-m'},fmtDay(z.datum).replace(/^\w+\.,\s*/,'')),h('td',null,h('strong',null,z.firma||'–'),h('div',{class:'eyebrow'},(z.art==='einrichtung'?'Einrichtung':'Lizenz '+fmtMonth(z.monat))+(z.storniert?' · storniert':''))),h('td',{class:'hide-m'},z.partner?pname(z.partner):'Direkt'),h('td',{class:'num'},eur(z.netto)),h('td',{class:'num'},h('span',{class:'m-only'},'Provision '),z.partner&&!z.storniert?eur(pv):'–')));}
   out.push(h('section',{class:'card'},h('h2',null,'Alle Zahlungen'),zs.length?h('table',{class:'ctable'},h('thead',null,h('tr',null,h('th',{class:'hide-m'},'Datum'),h('th',null,'Kunde'),h('th',{class:'hide-m'},'Partner'),h('th',{class:'num'},'Netto'),h('th',{class:'num'},'Provision'))),tb):h('div',{class:'eyebrow'},'Noch keine Zahlungen. Einzelne Zahlungen verbuchst du in der Kundenakte unter „Vertriebspartner & Zahlungen“.'),
     h('div',{class:'eyebrow'},'Stornieren geht in der jeweiligen Kundenakte.')));
   return out;
