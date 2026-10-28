@@ -359,9 +359,10 @@ const timers={};
 function unionBy(a,b,key){const m=new Map();for(const x of (a||[]).concat(b||[]))m.set(key(x),x);return [...m.values()];}
 function mergeCrm(curCrm,pCrm){
   const out={};
-  if(pCrm.log)out.log=unionBy(curCrm.log,pCrm.log,e=>e.at+'|'+e.by+'|'+e.text).sort((x,y)=>String(y.at).localeCompare(String(x.at)));
+  if(pCrm.log)out.log=unionBy(curCrm.log,pCrm.log,e=>e.id||(e.at+'|'+e.by+'|'+e.text)).sort((x,y)=>String(y.at).localeCompare(String(x.at)));
   if(pCrm.history)out.history=unionBy(curCrm.history,pCrm.history,e=>e.at+'|'+e.by+'|'+e.s).sort((x,y)=>String(x.at).localeCompare(String(y.at)));
   if(pCrm.logDel)out.logDel=unionBy(curCrm.logDel,pCrm.logDel,k=>k);
+  if(out.history&&out.history.length&&pCrm.status)out.status=out.history[out.history.length-1].s;
   return out;
 }
 function deepMerge(t,p){for(const k in p){const v=p[k];if(v&&typeof v==='object'&&!Array.isArray(v)){if(!t[k]||typeof t[k]!=='object')t[k]={};deepMerge(t[k],v);}else t[k]=v;}return t;}
@@ -537,7 +538,7 @@ function viewUnterschrift(c){
   if(signed(c)){
     const sg=c.signature;
     const reset=S.confirm==='unsign'+c.id
-      ?h('div',{class:'confirm'},'Unterschrift zurückziehen und neue Version starten? Das bisherige PDF bleibt gültig, die Akte wird wieder bearbeitbar.',h('button',{type:'button',class:'btn danger',onclick:async()=>{const hist=(c.history||[]).concat([sg]);const up={signature:null,history:hist,pdfAt:null};if((crmOf(c).status||'')==='unterschrieben'){const prev=(crmOf(c).history||[]).slice().reverse().find(e=>(CRM_RANK[e.s]||0)<CRM_RANK.unterschrieben);Object.assign(up,crmPatch(c,prev?prev.s:'termin'));}await S.db.doc('customers/'+c.id).update(up);S.confirm=null;toast('Neue Version gestartet');render();}},'Ja, neue Version'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
+      ?h('div',{class:'confirm'},'Unterschrift zurückziehen und neue Version starten? Das bisherige PDF bleibt gültig, die Akte wird wieder bearbeitbar.',h('button',{type:'button',class:'btn danger',onclick:async()=>{const hist=(c.history||[]).concat([sg]);const up={signature:null,history:hist,pdfAt:null};if((crmOf(c).status||'')==='unterschrieben'){const prev=(crmOf(c).history||[]).slice().reverse().find(e=>e.s!=='verloren'&&(CRM_RANK[e.s]||0)<CRM_RANK.unterschrieben);Object.assign(up,crmPatch(c,prev?prev.s:'termin'));}await S.db.doc('customers/'+c.id).update(up);S.confirm=null;toast('Neue Version gestartet');render();}},'Ja, neue Version'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
       :h('button',{type:'button',class:'btn danger',onclick:()=>{S.confirm='unsign'+c.id;render();}},'Neue Version starten');
     return [h('div',null,h('div',{class:'eyebrow'},c.firma),h('h1',null,'Unterschrift')),
       h('div',{class:'banner ok'},'Unterschrieben am '+fmtDate(sg.signedAt)+' in '+sg.ort+'.'),
@@ -837,15 +838,15 @@ function crmCard(c){
   const ta=h('textarea',{id:'cr-log','aria-label':'Eintrag',placeholder:'Was wurde besprochen? Nächster Schritt?',style:'min-height:70px'});
   const addLog=h('button',{type:'button',class:'btn primary',onclick:()=>{
     const text=ta.value.trim();if(!text){toast('Bitte zuerst etwas eintragen.');return;}
-    const entry={at:new Date().toISOString(),by:(S.me&&S.me.email)||'',type:S.logType,text};
+    const entry={id:(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random()),at:new Date().toISOString(),by:(S.me&&S.me.email)||'',type:S.logType,text};
     const p={crm:{log:[entry].concat(crmOf(cur()||c).log||[])}};
     if(S.logType==='Anruf'&&cs==='neu')Object.assign(p.crm,crmPatch(c,'angerufen').crm);
     saveCust(c.id,p,0);ta.value='';toast(p.crm.status?'Gespeichert · Status: Angerufen':'Eintrag gespeichert');render._force=true;render();
   }},'Eintrag speichern');
   const log=h('div',{class:'log'});
-  const dels=new Set(cr.logDel||[]),entries=(cr.log||[]).filter(e=>!dels.has(e.at+'|'+e.by));
+  const lk=e=>e.id||(e.at+'|'+e.by);const dels=new Set(cr.logDel||[]),entries=(cr.log||[]).filter(e=>!dels.has(lk(e)));
   for(const e of entries.slice(0,S.logAll===c.id?999:5)){
-    const k=e.at+'|'+e.by;
+    const k=lk(e);
     log.append(h('div',{class:'logi'},h('div',{class:'lm row',style:'gap:8px'},h('span',null,fmtDate(e.at)+' · '+e.type+(e.by?' · '+e.by:'')),h('span',{class:'spacer'}),
       S.confirm==='log:'+k?h('span',{class:'row',style:'gap:6px'},h('button',{type:'button',class:'linkbtn',style:'color:#b42318',onclick:()=>{saveCust(c.id,{crm:{logDel:(crmOf(cur()||c).logDel||[]).concat([k])}},0);S.confirm=null;toast('Eintrag gelöscht');render();}},'Löschen bestätigen'),h('button',{type:'button',class:'linkbtn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
         :h('button',{type:'button',class:'linkbtn','aria-label':'Eintrag löschen',onclick:()=>{S.confirm='log:'+k;render();}},'Löschen')),
@@ -907,7 +908,7 @@ function viewDashboard(){
   const list=(f?by[f]:cs.slice()).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
   const tb=h('tbody');
   for(const c of list){
-    const dl=new Set(crmOf(c).logDel||[]);const last=(crmOf(c).log||[]).find(e=>!dl.has(e.at+'|'+e.by));
+    const dl=new Set(crmOf(c).logDel||[]);const last=(crmOf(c).log||[]).find(e=>!dl.has(e.id||(e.at+'|'+e.by)));
     tb.append(h('tr',{class:'clk',tabindex:'0',onclick:()=>open(c),onkeydown:e=>{if(e.key==='Enter')open(c);}},
       h('td',null,h('strong',null,c.firma||'Ohne Namen')),h('td',null,statEl(stat(c))),
       h('td',{class:'hide-m'},crmOf(c).termin?fmtDay(crmOf(c).termin):'–'),
@@ -1044,13 +1045,24 @@ function makeDb(sb){
   }
   const notify=col=>{for(const l of listeners)if(l.col===col)emit(l);};
   sb.channel('docs-changes').on('postgres_changes',{event:'*',schema:'public',table:'docs'},p=>{const col=(p.new&&p.new.collection)||(p.old&&p.old.collection);if(col)notify(col);else for(const l of listeners)emit(l);}).subscribe();
+  async function fetchRow(col,id){const {data,error}=await sb.from('docs').select('data,updated_at').eq('collection',col).eq('id',id).maybeSingle();if(error)throw error;return data||null;}
+  async function writeIf(col,id,data,stamp){let q=sb.from('docs').update({data,updated_at:new Date().toISOString()}).eq('collection',col).eq('id',id);q=stamp==null?q.is('updated_at',null):q.eq('updated_at',stamp);const {data:rows,error}=await q.select('id');if(error)throw error;return !!(rows&&rows.length);}
   async function write(col,id,data){const {error}=await sb.from('docs').upsert({collection:col,id,data,updated_at:new Date().toISOString()});if(error)throw error;}
   function doc(path){
     const [col,id]=path.split('/');const key=col+'/'+id;
     return {id,
       get:async()=>snap(id,await fetchDoc(col,id)),
       set:d=>enqueue(key,async()=>{await write(col,id,d);notify(col);}),
-      update:p=>enqueue(key,async()=>{const cur=await fetchDoc(col,id);if(!cur)throw new Error('Datensatz nicht gefunden');const pp=JSON.parse(JSON.stringify(p));if(pp.crm&&typeof pp.crm==='object')Object.assign(pp.crm,mergeCrm((cur.crm)||{},pp.crm));await write(col,id,deepMerge(JSON.parse(JSON.stringify(cur)),pp));notify(col);}),
+      update:p=>enqueue(key,async()=>{
+        // Lesen, zusammenführen, nur schreiben, wenn niemand dazwischen gespeichert hat (sonst bis zu 4 Versuche)
+        for(let i=0;i<4;i++){
+          const row=await fetchRow(col,id);if(!row)throw new Error('Datensatz nicht gefunden');const cur=row.data;
+          const pp=JSON.parse(JSON.stringify(p));if(pp.crm&&typeof pp.crm==='object')Object.assign(pp.crm,mergeCrm((cur.crm)||{},pp.crm));
+          if(await writeIf(col,id,deepMerge(JSON.parse(JSON.stringify(cur)),pp),row.updated_at)){notify(col);return;}
+          await new Promise(r=>setTimeout(r,80+Math.random()*200));
+        }
+        throw new Error('Gleichzeitige Änderung, bitte erneut speichern.');
+      }),
       delete:()=>enqueue(key,async()=>{const {error}=await sb.from('docs').delete().eq('collection',col).eq('id',id);if(error)throw error;notify(col);}),
       onSnapshot(cb,err){const l={type:'doc',col,id,cb,err};listeners.add(l);emit(l);return()=>listeners.delete(l);}
     };

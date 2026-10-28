@@ -17,8 +17,10 @@
     }
     const f = {}; let mode = 'select', payload = null;
     const api = {
-      select(){ mode = mode === 'delete' ? 'delete' : 'select'; return api; },
+      select(){ mode = (mode === 'delete' || mode === 'update') ? mode : 'select'; return api; },
       eq(k, v){ f[k] = v; return api; },
+      is(k, v){ f[k] = v; return api; },
+      update(r){ mode = 'update'; payload = r; return api; },
       maybeSingle(){ return run(true); },
       upsert(r){ mode = 'upsert'; payload = r; return run(false); },
       delete(){ mode = 'delete'; return api; },
@@ -27,6 +29,7 @@
     function match(r){ return Object.keys(f).every(k => r[k] === f[k]); }
     async function run(single){
       await new Promise(r => setTimeout(r, 5));
+      if (mode === 'update'){ if (window.__raceOnce){ const fn = window.__raceOnce; window.__raceOnce = null; fn(); } const hit = [...rows.values()].filter(r => Object.keys(f).every(k => (r[k] ?? null) === (f[k] ?? null))); for (const r of hit) Object.assign(r, JSON.parse(JSON.stringify(payload))); return {data: hit.map(r => ({id: r.id})), error: null}; }
       if (mode === 'upsert'){ rows.set(payload.collection + '/' + payload.id, JSON.parse(JSON.stringify(payload))); return {error:null}; }
       if (mode === 'delete'){ for (const [k, r] of rows) if (match(r)) rows.delete(k); return {error:null}; }
       const list = [...rows.values()].filter(match).map(r => JSON.parse(JSON.stringify(r)));

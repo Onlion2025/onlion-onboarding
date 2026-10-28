@@ -180,6 +180,11 @@ try:
         lead = page.evaluate("()=>[...__rows.values()].find(r=>r.data.firma==='Lead AG').data")
         texts = [e['text'] for e in lead['crm']['log']]
         ok('Gleichzeitige Einträge gehen nicht verloren (%s)' % ', '.join(texts), 'Eintrag vom Partner' in texts and 'Rückruf vereinbart' in texts and 'Erstgespräch, Interesse an Pilot' in texts)
+        # Echt gleichzeitig: anderes Gerät schreibt zwischen Lesen und Schreiben
+        page.evaluate("()=>{window.__raceOnce=()=>{const r=[...__rows.values()].find(r=>r.data.firma==='Lead AG');r.data.crm.log=[{id:'x1',at:'2026-10-28T09:30:00.000Z',by:'a@b.de',type:'Anruf',text:'Zeitgleich vom Partner'}].concat(r.data.crm.log);r.updated_at='2026-10-28T19:59:59.000Z';};}")
+        page.fill('#cr-log', 'Mein Eintrag zur selben Zeit'); page.click('button:has-text("Eintrag speichern")'); page.wait_for_timeout(900)
+        texts = [e['text'] for e in page.evaluate("()=>[...__rows.values()].find(r=>r.data.firma==='Lead AG').data.crm.log")]
+        ok('Zeitgleiches Speichern: beide Einträge erhalten', 'Zeitgleich vom Partner' in texts and 'Mein Eintrag zur selben Zeit' in texts and 'Eintrag vom Partner' in texts)
         page.click('.logi:has-text("Rückruf vereinbart") >> button:has-text("Löschen")'); page.click('button:has-text("Löschen bestätigen")'); page.wait_for_timeout(500)
         ok('Protokolleintrag löschbar', 'Rückruf vereinbart' not in page.inner_text('.log'))
         ok('Erfasser wird angezeigt', 'a@b.de' in page.inner_text('.log'))
