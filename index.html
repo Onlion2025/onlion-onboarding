@@ -79,8 +79,9 @@ input:disabled,textarea:disabled,select:disabled{opacity:.6}
 .stage.now{border-color:var(--accent-ink);box-shadow:inset 0 0 0 1px var(--accent-ink)}
 .stage.locked{opacity:.55;cursor:default}
 .stage .k{font-size:12px;font-weight:700;letter-spacing:.06em}
-.stage .t{font-size:clamp(15px,1.35vw,18px);font-weight:800;line-height:1.25;overflow-wrap:break-word;hyphens:auto}
-.stage .d{font-size:13px;line-height:1.4;overflow-wrap:break-word;hyphens:auto}
+.stage{container-type:inline-size}
+.stage .t{font-size:clamp(15px,12cqi,18px);font-weight:800;line-height:1.25;overflow-wrap:normal;word-break:normal;hyphens:manual}
+.stage .d{font-size:clamp(12px,8.5cqi,13px);line-height:1.4;overflow-wrap:normal;hyphens:manual}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
 .chip{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--line-strong);background:var(--panel);color:var(--fg);cursor:pointer;font-size:13px}
 .chip.on{background:var(--lime);color:var(--lime-ink);border-color:var(--lime);font-weight:600}
@@ -109,7 +110,7 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
 .tpl-q{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;word-break:break-all;color:var(--muted)}
 .confirm{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#fff1ef;border:1px solid #f1b8b0;border-radius:12px;padding:10px 12px}
-@media (max-width:1060px){.stages{grid-template-columns:minmax(0,1fr)}.stage{min-height:0}}
+@media (max-width:1199px){.stages{grid-template-columns:minmax(0,1fr);gap:10px}.stage{min-height:0;display:grid;grid-template-columns:130px minmax(0,1fr);grid-template-rows:auto auto;column-gap:16px;row-gap:2px;align-items:baseline;padding:16px 18px}.stage .k{grid-row:1/3}.stage .t{font-size:18px}.stage .d{font-size:14px}}
 @media (max-width:860px){.split{grid-template-columns:minmax(0,1fr)}.side{max-width:none;flex-basis:100%;border-right:0;border-bottom:1px solid var(--line)}.paper{max-height:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
