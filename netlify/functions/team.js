@@ -23,7 +23,7 @@ exports.handler = async (event) => {
     if (role === 'partner' && b.sponsor) {
       sponsor = lc(b.sponsor);
       const sp = await teamRow(sponsor);
-      if (!sp || sp.role !== 'partner' || sponsor === email) return json(400, { error: 'Der gewählte Werber ist kein Vertriebspartner.' });
+      if (!sp || sp.role !== 'partner' || sp.status === 'inaktiv' || sponsor === email) return json(400, { error: 'Der gewählte Werber ist kein aktiver Vertriebspartner.' });
     }
     if (!existing) {
       const row = { email, role };

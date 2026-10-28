@@ -10,7 +10,7 @@ TEAM = [
   {'email': 'adam@test.de', 'role': 'owner', 'sponsor': None, 'status': 'aktiv'},
   {'email': 'p1@x.de', 'role': 'partner', 'sponsor': None, 'status': 'aktiv', 'name': 'Paula Eins', 'adresse': 'Weg 1, 90402 Nürnberg'},
   {'email': 'p2@x.de', 'role': 'partner', 'sponsor': 'p1@x.de', 'status': 'aktiv', 'name': 'Peter Zwei', 'adresse': 'Weg 2'},
-  {'email': 'p3@x.de', 'role': 'partner', 'sponsor': 'p2@x.de', 'status': 'aktiv', 'name': 'Petra Drei', 'adresse': 'Weg 3'},
+  {'email': 'p3@x.de', 'role': 'partner', 'sponsor': 'p2@x.de', 'status': 'aktiv', 'name': 'Petra Drei', 'adresse': 'Weg 3', 'steuer_nr': '241/123/45678'},
 ]
 SEED = [{'collection': 'templates', 'id': 'ki-telefon-agent', 'data': tpl}, {'collection': 'legal', 'id': 'ki-telefon-agent', 'data': legal}]
 results = []
@@ -53,6 +53,8 @@ try:
         a.fill('#md-e2', '6'); a.wait_for_timeout(800); a.click('button:has-text("Freigeben …")'); a.click('button:has-text("Ja, freigeben")'); a.wait_for_timeout(500)
         cfgd = a.evaluate("()=>[...__rows.values()].find(r=>r.collection==='config').data")
         ok('Neue Version freigegeben', len(cfgd['versions']) == 2 and cfgd['versions'][1]['rates']['einrichtung'] == [50, 10, 6] and cfgd['draft'] is None)
+        a.fill('#ab-a', 'Musterstraße 1, 91161 Hilpoltstein'); a.click('section:has(#ab-a) >> button:has-text("Speichern")'); a.wait_for_timeout(300)
+        ok('Absender gespeichert', a.evaluate("()=>[...__rows.values()].find(r=>r.collection==='config').data.absender.adresse").startswith('Musterstraße'))
         a.screenshot(path=T + '/v-modell.png', full_page=True)
         # Kunde von p2 (damit p2 aktiv ist), dann Kunde von p3
         new_customer(a, 'Zwei GmbH', 'p2@x.de')
@@ -72,11 +74,17 @@ try:
         ok('p3 Verkäufer 1.250 €', by.get('p3@x.de', {}).get('betrag') == 1250 and by['p3@x.de']['ebene'] == 0)
         ok('p2 Ebene 1: 250 €', by.get('p2@x.de', {}).get('betrag') == 250 and by['p2@x.de']['ebene'] == 1 and by['p2@x.de']['kunde'] == '')
         ok('p1 Ebene 2 ohne eigenen Abschluss: keine Provision', 'p1@x.de' not in by)
+        a.click('button:has-text("Zahlungseingang verbuchen")'); a.wait_for_timeout(400)
+        ok('Doppelte Einrichtung wird abgefangen', len([x for x in prov(a) if x['art'] == 'einrichtung' and x['kunde'] == 'Drei AG']) == 1)
+        a.click('#navVertrieb'); a.click('.chip:has-text("Provisionsmodell")'); a.wait_for_selector('#md-l0')
+        a.fill('#md-l0', '10'); a.wait_for_timeout(800); a.click('button:has-text("Freigeben …")'); a.click('button:has-text("Ja, freigeben")'); a.wait_for_timeout(500)
+        a.click('#custList .navbtn:has-text("Drei AG")'); a.wait_for_selector('#pay-amt')
         # Lizenz
         a.click('#pay-partner'); a.click('.chip:has-text("Lizenz (Monat)")'); a.wait_for_timeout(200)
         ok('Lizenzbetrag aus Staffel (450 €)', a.input_value('#pay-amt') == '450')
         a.click('button:has-text("Zahlungseingang verbuchen")'); a.wait_for_timeout(600)
         liz = {x['partner']: x for x in prov(a) if x['art'] == 'lizenz'}
+        ok('Lizenz nach Konditionen der Einrichtung (15 %, nicht neue 10 %)', liz.get('p3@x.de', {}).get('satz') == 15)
         ok('Lizenz: p3 15 % = 67,50 €, p2 3 % = 13,50 €', liz.get('p3@x.de', {}).get('betrag') == 67.5 and liz.get('p2@x.de', {}).get('betrag') == 13.5 and liz['p3@x.de']['lizenzMonat'] == 1)
         a.screenshot(path=T + '/v-kunde.png', full_page=True)
         # Storno der Lizenz
@@ -86,6 +94,9 @@ try:
         # Lizenzmonat gesammelt verbuchen
         a.click('#navVertrieb'); a.click('.chip:has-text("Zahlungen")'); a.wait_for_selector('#lic-m')
         ok('Beide Kunden für Lizenz vorgeschlagen', 'Zwei GmbH' in a.inner_text('#view') and 'Drei AG' in a.inner_text('#view'))
+        a.click('button:has-text("Ausgewählte als bezahlt verbuchen")'); a.wait_for_timeout(300)
+        ok('Nichts vorausgewählt', len([x for x in prov(a) if x['art'] == 'lizenz' and x['status'] == 'faellig']) == 0)
+        a.click('button:has-text("Alle auswählen")'); a.wait_for_timeout(200)
         a.click('button:has-text("Ausgewählte als bezahlt verbuchen")'); a.wait_for_timeout(700)
         liz = [x for x in prov(a) if x['art'] == 'lizenz' and x['status'] == 'faellig']
         ok('Sammelbuchung erzeugt Lizenz-Provisionen (%d)' % len(liz), len(liz) == 3)
@@ -116,6 +127,8 @@ try:
         a.click('.member:has-text("Einrichtung") >> button:has-text("Stornieren")'); a.click('.confirm >> button:has-text("Stornieren")'); a.wait_for_timeout(600)
         neg = [x for x in prov(a) if x.get('storno')]
         ok('Storno nach Auszahlung bucht Rückforderung (%s)' % [x['betrag'] for x in neg], any(x['partner'] == 'p3@x.de' and x['betrag'] == -1250 for x in neg))
+        a.click('#navVertrieb'); a.click('.chip:has-text("Abrechnung")'); a.fill('#gs-m', time.strftime('%Y-%m')); a.dispatch_event('#gs-m', 'change'); a.wait_for_timeout(300)
+        ok('Rückforderung ohne negative Gutschrift', 'Rückforderung' in a.inner_text('#view') and a.query_selector('button:has-text("Gutschriften erstellen")') is None)
         rows = a.evaluate("()=>[...__rows.values()]")
         a.click('#navVertrieb'); a.click('.chip:has-text("Partner")'); a.wait_for_timeout(200)
         a.set_viewport_size({'width': 390, 'height': 844}); a.wait_for_timeout(300)
@@ -127,7 +140,7 @@ try:
         pp = page_for(ctx, TEAM, rows); login(pp, 'p3@x.de')
         ok('Partner sieht „Provisionen“, keine Vorlagen', pp.inner_text('#navVertrieb') == 'Provisionen' and not pp.is_visible('#navTpl'))
         ok('Partner sieht nur eigenen Kunden', 'Drei AG' in pp.inner_text('#custList') and 'Zwei GmbH' not in pp.inner_text('#custList'))
-        ok('Partner sieht keine Zahlungs-Karte', pp.query_selector('#pay-amt') is None)
+        ok('Partner sieht keine Zahlungs-Karte, kein Löschen', pp.query_selector('#pay-amt') is None and pp.query_selector('button:has-text("Kundenakte löschen")') is None)
         pp.click('#navVertrieb'); pp.wait_for_selector('text=Provisionskonto')
         v = pp.inner_text('#view')
         ok('Partner: Konditionen, Konto, Gutschrift, Struktur', 'Deine Konditionen' in v and 'Drei AG' in v and 'GS-' in v and 'Pia Vier' in v)

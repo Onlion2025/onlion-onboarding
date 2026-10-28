@@ -16,6 +16,9 @@ alter table public.team add column if not exists steuer_nr        text;
 alter table public.team add column if not exists kleinunternehmer boolean not null default false;
 alter table public.team add column if not exists vertrag_am       date;
 alter table public.team add column if not exists sonder           jsonb;
+-- Werber kann nicht gelöscht werden, solange er Partner in seiner Struktur hat
+alter table public.team drop constraint if exists team_sponsor_fkey;
+alter table public.team add constraint team_sponsor_fkey foreign key (sponsor) references public.team(email) on update cascade on delete restrict;
 alter table public.team drop constraint if exists team_sponsor_not_self;
 alter table public.team add constraint team_sponsor_not_self check (sponsor is null or sponsor <> email);
 
@@ -72,7 +75,11 @@ drop policy if exists "Admin liest Team" on public.team;
 drop policy if exists "Admin ändert Team" on public.team;
 drop policy if exists "Partner liest sich" on public.team;
 create policy "Admin liest Team" on public.team for select to authenticated using (public.is_admin());
-create policy "Admin ändert Team" on public.team for update to authenticated using (public.is_admin()) with check (public.is_admin());
+-- ONLION darf nur Partnerdaten ändern: keine Rollen, keine E-Mail, keine Sperrzeiten
+revoke update on public.team from authenticated;
+grant update (name, firma, adresse, steuer_nr, kleinunternehmer, vertrag_am, sonder, status, sponsor) on public.team to authenticated;
+create policy "Admin ändert Team" on public.team for update to authenticated
+  using (public.is_admin() and role = 'partner') with check (public.is_admin() and role = 'partner');
 create policy "Partner liest sich" on public.team for select to authenticated using (email = public.my_email());
 
 -- 4) Daten: ONLION alles, Partner nur eigene Kunden und eigene Abrechnung
@@ -80,6 +87,9 @@ drop policy if exists "Nur Team" on public.docs;
 drop policy if exists "Admin alles" on public.docs;
 drop policy if exists "Partner liest Stammdaten" on public.docs;
 drop policy if exists "Partner eigene Kunden" on public.docs;
+drop policy if exists "Partner liest eigene Kunden" on public.docs;
+drop policy if exists "Partner legt Kunden an" on public.docs;
+drop policy if exists "Partner ändert eigene Kunden" on public.docs;
 drop policy if exists "Partner eigene Abrechnung" on public.docs;
 drop policy if exists "Partner Vorschlag anlegen" on public.docs;
 drop policy if exists "Partner Vorschlag lesen" on public.docs;
@@ -90,7 +100,12 @@ create policy "Admin alles" on public.docs for all to authenticated
 create policy "Partner liest Stammdaten" on public.docs for select to authenticated
   using (public.is_partner() and collection in ('templates', 'legal', 'config'));
 
-create policy "Partner eigene Kunden" on public.docs for all to authenticated
+-- Partner: eigene Kunden lesen, anlegen, ändern – aber nicht löschen
+create policy "Partner liest eigene Kunden" on public.docs for select to authenticated
+  using (public.is_partner() and collection = 'customers' and data ->> 'partner' = public.my_email());
+create policy "Partner legt Kunden an" on public.docs for insert to authenticated
+  with check (public.is_partner() and collection = 'customers' and data ->> 'partner' = public.my_email());
+create policy "Partner ändert eigene Kunden" on public.docs for update to authenticated
   using (public.is_partner() and collection = 'customers' and data ->> 'partner' = public.my_email())
   with check (public.is_partner() and collection = 'customers' and data ->> 'partner' = public.my_email());
 
@@ -103,6 +118,6 @@ create policy "Partner Vorschlag anlegen" on public.docs for insert to authentic
 create policy "Partner Vorschlag lesen" on public.docs for select to authenticated
   using (public.is_partner() and collection = 'vorschlaege' and data ->> 'von' = public.my_email());
 
--- Kontrolle: 6 Policies auf docs, 3 auf team
+-- Kontrolle: 8 Policies auf docs, 3 auf team
 select tablename, policyname, cmd from pg_policies
 where schemaname = 'public' and tablename in ('docs', 'team') order by tablename, policyname;

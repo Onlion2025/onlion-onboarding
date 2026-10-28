@@ -157,7 +157,7 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
 .ditem:hover{background:var(--panel2)}
 .ditem .dn{flex:1 1 180px;font-weight:600;min-width:0;overflow-wrap:anywhere}
 .ditem .dd{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
-.ditem .dd.late{color:#b42318;font-weight:600}
+.ditem .dd.late,.eyebrow.late{color:#b42318;font-weight:600}
 .cols2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
 .ctable{width:100%;border-collapse:collapse;font-size:14px}
 .ctable th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line-strong)}
@@ -455,7 +455,7 @@ function viewStart(c){
   return [
     h('div',{class:'row',style:'align-items:flex-end'},h('div',null,h('div',{class:'eyebrow'},'KI-Telefon-Agent'),h('h1',null,c.firma||'Ohne Namen')),h('div',{class:'spacer'}),
       next?h('button',{type:'button',class:'btn primary',onclick:()=>{S.view=next.id;render();}},'Weiter: '+next.t):null),
-    crmCard(c),payCard(c),progressEl(c,false),stages,stamm,h('div',{class:'row'},del)];
+    crmCard(c),payCard(c),progressEl(c,false),stages,stamm,isAdmin()?h('div',{class:'row'},del):null];
 }
 
 function viewFragen(c){
@@ -958,24 +958,28 @@ function monthStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(
 function monthsBetween(a,b){const [y1,m1]=a.split('-').map(Number),[y2,m2]=b.split('-').map(Number);return (y2-y1)*12+(m2-m1);}
 function quarterWindowStart(d,n){const x=new Date(d+'T12:00');const q=Math.floor(x.getMonth()/3);const s=new Date(x.getFullYear(),q*3-3*(n-1),1);return s.getFullYear()+'-'+String(s.getMonth()+1).padStart(2,'0')+'-01';}
 function custOffer(c){const it=(c&&c.offer&&c.offer.items)||[];const e=it.find(i=>i.kind==='einrichtung'),l=it.find(i=>i.kind==='lizenz');return {einrichtung:e?r2(e.qty*e.price):0,lizenz:l?r2(l.qty*l.price):0};}
+function contractLicense(c){const e0=setupOf(c.id);return e0&&e0.lizenzVertrag!=null?e0.lizenzVertrag:custOffer(c).lizenz;}
 function liveProv(){return S.prov.filter(p=>p.status!=='storniert');}
 /* Provisionszeilen für eine Zahlung berechnen (nur ONLION). extra = schon berechnete Zeilen im selben Durchgang */
-function computeRows(z,extra){
+function setupOf(customerId,batch){return S.zahl.concat(batch||[]).filter(x=>x.customerId===customerId&&x.art==='einrichtung'&&!x.storniert).sort((a,b)=>String(a.datum).localeCompare(String(b.datum)))[0]||null;}
+function versionById(id){return cfg().versions.find(v=>v.id===id)||null;}
+function computeRows(z,batch){
   const out=[];const seller=String(z.partner||'').toLowerCase();if(!seller||z.netto<=0)return out;
   const chain=[seller];let cur=seller;for(let i=0;i<2;i++){const sp=sponsorOf(cur);if(!sp||chain.includes(sp))break;chain.push(sp);cur=sp;}
-  const v=versionAt(z.datum),R=v.rates||{};
-  let idx=1;
-  if(z.art==='lizenz'){const months=S.zahl.filter(x=>x.customerId===z.customerId&&x.art==='lizenz'&&!x.storniert&&x.id!==z.id).map(x=>x.monat).concat((extra||[]).filter(x=>x._z&&x._z.customerId===z.customerId&&x._z.art==='lizenz').map(x=>x._z.monat)).concat([z.monat]).filter(Boolean).sort();idx=monthsBetween(months[0],z.monat)+1;}
-  const pool=liveProv().concat(extra||[]);
+  // Konditionen: Einrichtung nach Modell am Zahlungstag; Lizenz nach den Konditionen, die bei der Einrichtung galten
+  let v=versionAt(z.datum),sonder=(tm(seller)||{}).sonder||null,idx=1;
+  if(z.art==='lizenz'){const e0=setupOf(z.customerId,batch);if(e0){v=versionById(e0.version)||versionAt(e0.datum);sonder=e0.sonder||null;idx=Math.max(1,monthsBetween(e0.lizenzStart||String(e0.datum).slice(0,7),z.monat)+1);}}
+  else if(z.sonder!==undefined)sonder=z.sonder;
+  const R=v.rates||{};const zahlPool=S.zahl.concat(batch||[]);
   chain.forEach((p,i)=>{
     const t=tm(p);if(!t||t.role!=='partner'||t.status==='inaktiv')return;
     let e=Number((R.einrichtung||[])[i])||0,l=Number((R.lizenz||[])[i])||0,lm=Number((R.lizenzMonate||[])[i])||0;
-    if(i===0&&t.sonder){if(t.sonder.einrichtung!=null&&t.sonder.einrichtung!=='')e=Number(t.sonder.einrichtung);if(t.sonder.lizenz!=null&&t.sonder.lizenz!=='')l=Number(t.sonder.lizenz);if(t.sonder.lizenzMonate!=null&&t.sonder.lizenzMonate!=='')lm=Number(t.sonder.lizenzMonate);}
+    if(i===0&&sonder){if(sonder.einrichtung!=null&&sonder.einrichtung!=='')e=Number(sonder.einrichtung);if(sonder.lizenz!=null&&sonder.lizenz!=='')l=Number(sonder.lizenz);if(sonder.lizenzMonate!=null&&sonder.lizenzMonate!=='')lm=Number(sonder.lizenzMonate);}
     const q=Number(R.aktivQuartale)||0;
-    if(i>0&&q>0){const from=quarterWindowStart(z.datum,q);const active=pool.some(r=>r.partner===p&&r.ebene===0&&r.art==='einrichtung'&&r.betrag>0&&r.datum>=from&&r.datum<=z.datum);if(!active)return;}
-    let satz=z.art==='einrichtung'?e:(idx<=lm?l:0);
+    if(i>0&&q>0){const from=quarterWindowStart(z.datum,q);const active=zahlPool.some(x=>x.partner===p&&x.art==='einrichtung'&&!x.storniert&&x.netto>0&&x.datum>=from&&x.datum<=z.datum);if(!active)return;}
+    const satz=z.art==='einrichtung'?e:(idx<=lm?l:0);
     if(!(satz>0))return;
-    out.push({id:uid(),partner:p,ebene:i,art:z.art,zahlungId:z.id,customerId:z.customerId,kunde:i===0?(z.firma||''):'',von:i>0?seller:'',basis:r2(z.netto),satz,betrag:r2(z.netto*satz/100),datum:z.datum,monat:z.monat||'',lizenzMonat:z.art==='lizenz'?idx:null,version:v.id,status:'faellig',gutschriftId:null,at:new Date().toISOString()});
+    out.push({id:uid(),partner:p,ebene:i,art:z.art,zahlungId:z.id,customerId:i===0?z.customerId:'',kunde:i===0?(z.firma||''):'',von:i>0?seller:'',basis:r2(z.netto),satz,betrag:r2(z.netto*satz/100),datum:z.datum,monat:z.monat||'',lizenzMonat:z.art==='lizenz'?idx:null,version:v.id,status:'faellig',gutschriftId:null,at:new Date().toISOString()});
   });
   return out;
 }
@@ -984,11 +988,12 @@ async function bookPayments(list){
   const zs=[],rows=[];
   for(const it of list){
     const c=it.customer;const z={id:uid(),customerId:c.id,firma:c.firma||'',partner:String(c.partner||'').toLowerCase(),art:it.art,netto:r2(it.netto),datum:it.datum,monat:it.art==='lizenz'?it.monat:'',storniert:false,by:(S.me&&S.me.email)||'',at:new Date().toISOString()};
-    const rs=computeRows(z,rows);rs.forEach(r=>r._z=z);zs.push(z);rows.push(...rs);
+    if(it.art==='einrichtung'){z.version=versionAt(z.datum).id;z.sonder=(tm(z.partner)||{}).sonder||null;z.lizenzVertrag=r2(it.lizenzVertrag!=null?it.lizenzVertrag:custOffer(c).lizenz);z.lizenzStart=it.lizenzStart||String(z.datum).slice(0,7);}
+    const rs=computeRows(z,zs);zs.push(z);rows.push(...rs);
   }
   await S.db.bulk('zahlungen',zs);
-  await S.db.bulk('provisionen',rows.map(r=>{const x=Object.assign({},r);delete x._z;return x;}));
-  S.zahl=S.zahl.concat(zs);S.prov=S.prov.concat(rows.map(r=>{const x=Object.assign({},r);delete x._z;return x;}));
+  await S.db.bulk('provisionen',rows);
+  S.zahl=S.zahl.concat(zs);S.prov=S.prov.concat(rows);
   for(const it of list){if(it.art==='einrichtung'){const c=it.customer;const st=stat(c);if(st!=='abgeschlossen'&&st!=='verloren')saveCust(c.id,crmPatch(c,'abgeschlossen'),0);}}
   return {zahlungen:zs.length,provisionen:rows.length,summe:r2(rows.reduce((s,r)=>s+r.betrag,0))};
 }
@@ -1001,15 +1006,18 @@ async function stornoPayment(z){
   await S.db.bulk('zahlungen',[Object.assign({},z,{storniert:true,storniertAm:new Date().toISOString()})]);
   if(upd.length||neu.length)await S.db.bulk('provisionen',upd.concat(neu));
 }
+function creditMissing(t){const m=[];if(!t||!t.adresse)m.push('Anschrift');if(t&&!t.kleinunternehmer&&!t.steuer_nr)m.push('Steuer-Nr./USt-ID');if(!t||!(t.name||t.firma))m.push('Name');return m;}
 function lastDayOfMonth(m){const [y,mo]=m.split('-').map(Number);const d=new Date(y,mo,0);return m+'-'+String(d.getDate()).padStart(2,'0');}
 async function createCredits(month){
   const end=lastDayOfMonth(month);const year=month.slice(0,4);
-  let n=S.gs.filter(g=>String(g.nr||'').startsWith('GS-'+year)).length;
+  let n=S.gs.filter(g=>String(g.nr||'').startsWith('GS-'+year)).reduce((mx,g)=>Math.max(mx,parseInt(String(g.nr).split('-')[2],10)||0),0);
   const by={};for(const r of S.prov)if(r.status==='faellig'&&r.datum<=end)(by[r.partner]=by[r.partner]||[]).push(r);
   const gs=[],upd=[];
   for(const p of Object.keys(by).sort()){
-    const t=tm(p)||{email:p};const rows=by[p];n++;
-    const netto=r2(rows.reduce((s,r)=>s+r.betrag,0));const ustSatz=t.kleinunternehmer?0:19;const ust=r2(netto*ustSatz/100);
+    const t=tm(p)||{email:p};const rows=by[p];
+    const netto=r2(rows.reduce((s,r)=>s+r.betrag,0));
+    if(netto<=0||creditMissing(t).length)continue; // Rückforderungen werden mit späteren Provisionen verrechnet
+    n++;const ustSatz=t.kleinunternehmer?0:19;const ust=r2(netto*ustSatz/100);
     const g={id:uid(),nr:'GS-'+year+'-'+String(n).padStart(3,'0'),partner:p,monat:month,datum:todayStr(),empfaenger:{name:t.name||'',firma:t.firma||'',adresse:t.adresse||'',steuer:t.steuer_nr||'',kleinunternehmer:!!t.kleinunternehmer,email:p},absender:cfg().absender,positionen:rows.map(r=>({datum:r.datum,text:provText(r),art:r.art,basis:r.basis,satz:r.satz,betrag:r.betrag})),netto,ustSatz,ust,brutto:r2(netto+ust),status:'offen',at:new Date().toISOString(),by:(S.me&&S.me.email)||''};
     gs.push(g);for(const r of rows)upd.push(Object.assign({},r,{status:'abgerechnet',gutschriftId:g.id}));
   }
@@ -1073,10 +1081,12 @@ function payCard(c){
   const sel=h('select',{id:'pay-partner',onchange:e=>{saveCust(c.id,{partner:e.target.value},0);toast(e.target.value?'Vertriebspartner zugeordnet':'Direktvertrieb ONLION');}},h('option',{value:''},'Direktvertrieb ONLION (keine Provision)'),...partners().map(p=>{const o=h('option',{value:p.email},(p.name||p.email)+(p.status==='inaktiv'?' (inaktiv)':''));if(String(c.partner||'')===p.email)o.selected=true;return o;}));
   const o=custOffer(c);S.payForm=S.payForm&&S.payForm.cid===c.id?S.payForm:{cid:c.id};
   const f=S.payForm;if(!f.userArt)f.art=zs.some(z=>z.art==='einrichtung'&&!z.storniert)?'lizenz':'einrichtung';
-  const def=f.art==='einrichtung'?o.einrichtung:o.lizenz;
+  const def=f.art==='einrichtung'?o.einrichtung:contractLicense(c);
   const amt=h('input',{type:'number',id:'pay-amt',min:'0',step:'0.01',inputmode:'decimal',value:String(f.netto!=null?f.netto:def||'')});
   const dat=h('input',{type:'date',id:'pay-date',value:f.datum||todayStr()});
   const mon=h('input',{type:'month',id:'pay-month',value:f.monat||todayStr().slice(0,7)});
+  const lv=h('input',{type:'number',id:'pay-lic',min:'0',step:'0.01',inputmode:'decimal',value:String(f.lic!=null?f.lic:o.lizenz||0),oninput:e=>f.lic=e.target.value});
+  const ls=h('input',{type:'month',id:'pay-lstart',value:f.lstart||todayStr().slice(0,7),onchange:e=>f.lstart=e.target.value});
   const prev=h('div',{class:'eyebrow',id:'pay-prev'});
   const preview=()=>{const z={id:'x',customerId:c.id,firma:c.firma,partner:String(c.partner||'').toLowerCase(),art:f.art,netto:parseFloat(amt.value)||0,datum:dat.value,monat:mon.value};const rs=computeRows(z);prev.textContent=!z.partner?'Direktvertrieb: keine Provision.':rs.length?'Provision: '+rs.map(r=>pname(r.partner)+' '+eur(r.betrag)+' ('+pct(r.satz)+')').join(' · '):'Keine Provision nach aktuellem Modell.';};
   amt.addEventListener('input',()=>{f.netto=amt.value;preview();});dat.addEventListener('change',()=>{f.datum=dat.value;preview();});mon.addEventListener('change',()=>{f.monat=mon.value;preview();});
@@ -1085,8 +1095,10 @@ function payCard(c){
   const book=h('button',{type:'button',class:'btn primary',onclick:async e=>{
     const v=parseFloat(amt.value);if(!(v>0)){toast('Bitte einen Betrag eintragen.');return;}
     if(f.art==='lizenz'&&zs.some(z=>z.art==='lizenz'&&!z.storniert&&z.monat===mon.value)&&S.confirm!=='dup'+c.id){S.confirm='dup'+c.id;toast('Für diesen Monat ist schon eine Lizenz verbucht. Zum Bestätigen erneut tippen.');return;}
+    if(f.art==='einrichtung'&&zs.some(z=>z.art==='einrichtung'&&!z.storniert)&&S.confirm!=='dupe'+c.id){S.confirm='dupe'+c.id;toast('Die Einrichtung ist schon verbucht. Zum Bestätigen erneut tippen.');return;}
+    if(f.art==='lizenz'&&!setupOf(c.id)){toast('Bitte zuerst die Einrichtung verbuchen.');return;}
     e.currentTarget.disabled=true;
-    try{await flushAll();const res=await bookPayments([{customer:cur()||c,art:f.art,netto:v,datum:dat.value,monat:mon.value}]);S.payForm=null;S.confirm=null;toast('Zahlung verbucht'+(res.provisionen?' · Provision '+eur(res.summe):''));}catch(err){toast('Nicht verbucht: '+err.message);}
+    try{await flushAll();const res=await bookPayments([{customer:cur()||c,art:f.art,netto:v,datum:dat.value,monat:mon.value,lizenzVertrag:parseFloat(lv.value)||0,lizenzStart:ls.value}]);S.payForm=null;S.confirm=null;toast('Zahlung verbucht'+(res.provisionen?' · Provision '+eur(res.summe):''));}catch(err){toast('Nicht verbucht: '+err.message);}
     render._force=true;render();
   }},'Zahlungseingang verbuchen');
   const list=h('div',{class:'dlist'});
@@ -1100,7 +1112,7 @@ function payCard(c){
     h('h2',null,'Vertriebspartner & Zahlungen'),
     h('div',{class:'field'},h('label',{for:'pay-partner'},'Vertriebspartner (Verkäufer)'),sel),
     h('div',{class:'field'},h('label',null,'Zahlungseingang'),artChips),
-    h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'pay-amt'},'Betrag netto (€)'),amt),h('div',{class:'field'},h('label',{for:'pay-date'},'Eingang am'),dat),f.art==='lizenz'?h('div',{class:'field'},h('label',{for:'pay-month'},'Lizenzmonat'),mon):null),
+    h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'pay-amt'},'Betrag netto (€)'),amt),h('div',{class:'field'},h('label',{for:'pay-date'},'Eingang am'),dat),f.art==='lizenz'?h('div',{class:'field'},h('label',{for:'pay-month'},'Lizenzmonat'),mon):null,f.art==='einrichtung'?h('div',{class:'field'},h('label',{for:'pay-lic'},'Lizenz laut Vertrag (€ / Monat)'),lv):null,f.art==='einrichtung'?h('div',{class:'field'},h('label',{for:'pay-lstart'},'Lizenz ab Monat'),ls):null),
     prev,h('div',{class:'row'},book),list);
 }
 
@@ -1162,7 +1174,7 @@ function viewProvisionenPartner(){
   }},h('div',{class:'field'},h('label',{for:'vp-name'},'Name'),h('input',{type:'text',id:'vp-name'})),h('div',{class:'field'},h('label',{for:'vp-mail'},'E-Mail'),h('input',{type:'email',id:'vp-mail'})),h('div',{class:'field'},h('label',{for:'vp-note'},'Notiz (optional)'),h('input',{type:'text',id:'vp-note'})),h('div',null,h('button',{type:'submit',class:'btn primary'},'Partner vorschlagen')));
   return [
     h('div',null,h('div',{class:'eyebrow'},'Vertriebspartner'),h('h1',null,'Provisionen')),
-    h('div',{class:'kpis'},kpiTile('Offen',eur0(k.offen),'fällig oder abgerechnet',true),kpiTile('Ausgezahlt',eur0(k.aus),'gesamt'),kpiTile('Diesen Monat',eur0(k.monat),'neu verdient'),kpiTile('Eigene Abschlüsse',String(k.eigene),'bezahlte Einrichtungen'),kpiTile('Struktur',String(S.struct.length),'Partner in 2 Ebenen'),kpiTile('Kunden',String(S.customers.length),'in deiner Betreuung')),
+    h('div',{class:'kpis'},k.offen<0?kpiTile('Rückforderung',eur0(-k.offen),'wird mit neuen Provisionen verrechnet',true):kpiTile('Offen',eur0(k.offen),'fällig oder abgerechnet',true),kpiTile('Ausgezahlt',eur0(k.aus),'gesamt'),kpiTile('Diesen Monat',eur0(k.monat),'neu verdient'),kpiTile('Eigene Abschlüsse',String(k.eigene),'bezahlte Einrichtungen'),kpiTile('Struktur',String(S.struct.length),'Partner in 2 Ebenen'),kpiTile('Kunden',String(S.customers.length),'in deiner Betreuung')),
     h('section',{class:'card'},h('h2',null,'Deine Konditionen'),ratesTable(v.rates||{},t.sonder),h('div',{class:'eyebrow'},'Gültig ab '+fmtDay(v.from).replace(/^\w+\.,\s*/,'')+'. Provision entsteht, sobald die Zahlung des Kunden eingegangen ist. Anteile aus Ebene 1 und 2 nur bei mindestens einem eigenen bezahlten Abschluss im laufenden'+((v.rates||{}).aktivQuartale>1?' oder vorigen':'')+' Quartal.')),
     h('section',{class:'card'},h('h2',null,'Provisionskonto'),ledgerTable(rows,false)),
     h('section',{class:'card'},h('h2',null,'Gutschriften'),creditList(false)),
@@ -1285,15 +1297,15 @@ function vtModell(){
 }
 function vtZahlungen(){
   const out=[];const m=S.licMonth||todayStr().slice(0,7);
-  const cand=S.customers.filter(c=>stat(c)==='abgeschlossen'&&custOffer(c).lizenz>0&&!S.zahl.some(z=>z.customerId===c.id&&z.art==='lizenz'&&!z.storniert&&z.monat===m));
-  S.licSel=S.licSel&&S.licSel.m===m?S.licSel:{m,ids:new Set(cand.map(c=>c.id))};
+  const cand=S.customers.filter(c=>{const e0=setupOf(c.id);return e0&&contractLicense(c)>0&&String(e0.lizenzStart||'')<=m&&!S.zahl.some(z=>z.customerId===c.id&&z.art==='lizenz'&&!z.storniert&&z.monat===m);});
+  S.licSel=S.licSel&&S.licSel.m===m?S.licSel:{m,ids:new Set()};
   const list=h('div',{class:'dlist'});
   if(!cand.length)list.append(h('div',{class:'eyebrow'},'Für '+fmtMonth(m)+' ist keine Lizenz mehr offen.'));
-  for(const c of cand)list.append(h('label',{class:'check member'},h('input',{type:'checkbox',checked:S.licSel.ids.has(c.id),onchange:e=>{e.target.checked?S.licSel.ids.add(c.id):S.licSel.ids.delete(c.id);}}),h('span',{class:'who'},h('strong',null,c.firma||'Ohne Namen'),' · '+eur(custOffer(c).lizenz)+(c.partner?' · '+pname(c.partner):''))));
+  for(const c of cand)list.append(h('label',{class:'check member'},h('input',{type:'checkbox',checked:S.licSel.ids.has(c.id),onchange:e=>{e.target.checked?S.licSel.ids.add(c.id):S.licSel.ids.delete(c.id);}}),h('span',{class:'who'},h('strong',null,c.firma||'Ohne Namen'),' · '+eur(contractLicense(c))+(c.partner?' · '+pname(c.partner):''))));
   out.push(h('section',{class:'card'},h('h2',null,'Lizenzmonat verbuchen'),
     h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'lic-m'},'Monat'),h('input',{type:'month',id:'lic-m',value:m,onchange:e=>{S.licMonth=e.target.value;render._force=true;render();}})),h('div',{class:'field'},h('label',{for:'lic-d'},'Zahlungseingang am'),h('input',{type:'date',id:'lic-d',value:S.licDate||todayStr(),onchange:e=>S.licDate=e.target.value}))),
-    h('p',{class:'eyebrow',style:'margin:0'},'Abgeschlossene Kunden mit Lizenz im Angebot, für die dieser Monat noch nicht verbucht ist.'),list,
-    cand.length?h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async e=>{const ids=[...S.licSel.ids];if(!ids.length){toast('Keine Kunden ausgewählt.');return;}e.currentTarget.disabled=true;const res=await bookPayments(cand.filter(c=>ids.includes(c.id)).map(c=>({customer:c,art:'lizenz',netto:custOffer(c).lizenz,datum:S.licDate||todayStr(),monat:m})));S.licSel=null;toast(res.zahlungen+' Lizenzen verbucht · Provision '+eur(res.summe));render();}},'Ausgewählte als bezahlt verbuchen')):null));
+    h('p',{class:'eyebrow',style:'margin:0'},'Kunden mit verbuchter Einrichtung, deren Lizenz für diesen Monat noch nicht verbucht ist. Betrag laut Vertrag. Bitte nur bezahlte Kunden anhaken.'),cand.length?h('button',{type:'button',class:'linkbtn',onclick:()=>{for(const c of cand)S.licSel.ids.add(c.id);render._force=true;render();}},'Alle auswählen'):null,list,
+    cand.length?h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async e=>{const ids=[...S.licSel.ids];if(!ids.length){toast('Keine Kunden ausgewählt.');return;}e.currentTarget.disabled=true;const res=await bookPayments(cand.filter(c=>ids.includes(c.id)).map(c=>({customer:c,art:'lizenz',netto:contractLicense(c),datum:S.licDate||todayStr(),monat:m})));S.licSel=null;toast(res.zahlungen+' Lizenzen verbucht · Provision '+eur(res.summe));render();}},'Ausgewählte als bezahlt verbuchen')):null));
   const zs=S.zahl.slice().sort((a,b)=>String(b.datum).localeCompare(String(a.datum))||String(b.at).localeCompare(String(a.at)));
   const tb=h('tbody');
   for(const z of zs.slice(0,300)){const pv=r2(S.prov.filter(p=>p.zahlungId===z.id&&p.status!=='storniert'&&!p.storno).reduce((s,p)=>s+p.betrag,0));
@@ -1308,11 +1320,14 @@ function vtAbrechnung(){
   const due=S.prov.filter(r=>r.status==='faellig'&&r.datum<=end);const by={};for(const r of due)by[r.partner]=r2((by[r.partner]||0)+r.betrag);
   const prev=h('div',{class:'dlist'});
   if(!due.length)prev.append(h('div',{class:'eyebrow'},'Keine fälligen Provisionen bis Ende '+fmtMonth(m)+'.'));
-  for(const p of Object.keys(by).sort()){const t=tm(p)||{};prev.append(h('div',{class:'member'},h('div',{class:'who'},h('strong',null,pname(p)),h('div',{class:'eyebrow'},(t.kleinunternehmer?'Kleinunternehmer, ohne USt':'zzgl. 19 % USt')+(t.adresse?'':' · Anschrift fehlt'))),h('strong',null,eur(by[p]))));}
+  const ab=cfg().absender;const abMissing=!ab.adresse;let ready=0;
+  if(abMissing)prev.append(h('div',{class:'banner warn'},'Bitte zuerst unter „Provisionsmodell“ die Anschrift von ONLION für die Gutschriften eintragen.'));
+  for(const p of Object.keys(by).sort()){const t=tm(p)||{};const miss=creditMissing(t);const neg=by[p]<=0;if(!miss.length&&!neg)ready++;
+    prev.append(h('div',{class:'member'},h('div',{class:'who'},h('strong',null,pname(p)),h('div',{class:'eyebrow'+(miss.length?' late':'')},neg?'Rückforderung, wird mit späteren Provisionen verrechnet':miss.length?'Fehlt: '+miss.join(', ')+'. Erst ergänzen (Partner bearbeiten).':(t.kleinunternehmer?'Kleinunternehmer, ohne USt':'zzgl. 19 % USt'))),h('strong',null,eur(by[p]))));}
   out.push(h('section',{class:'card'},h('h2',null,'Monatsabrechnung'),
     h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'gs-m'},'Abrechnungsmonat'),h('input',{type:'month',id:'gs-m',value:m,onchange:e=>{S.gsMonth=e.target.value;render._force=true;render();}}))),
     h('p',{class:'eyebrow',style:'margin:0'},'Alle fälligen Provisionen bis Monatsende kommen auf eine Gutschrift je Partner. Danach als „ausgezahlt“ markieren, sobald überwiesen.'),prev,
-    due.length?(S.confirm==='gs'?h('div',{class:'confirm'},Object.keys(by).length+' Gutschriften für '+fmtMonth(m)+' erstellen?',h('button',{type:'button',class:'btn primary',onclick:async()=>{const n=await createCredits(m);S.confirm=null;toast(n+' Gutschriften erstellt');render();}},'Erstellen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen')):h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:()=>{S.confirm='gs';render();}},'Gutschriften erstellen'))):null));
+    (due.length&&ready&&!abMissing)?(S.confirm==='gs'?h('div',{class:'confirm'},ready+' Gutschriften für '+fmtMonth(m)+' erstellen?',h('button',{type:'button',class:'btn primary',onclick:async()=>{const n=await createCredits(m);S.confirm=null;toast(n+' Gutschriften erstellt');render();}},'Erstellen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen')):h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:()=>{S.confirm='gs';render();}},'Gutschriften erstellen'))):null));
   out.push(h('section',{class:'card'},h('h2',null,'Gutschriften'),creditList(true)));
   out.push(h('section',{class:'card'},h('h2',null,'Provisionskonto'),ledgerTable(S.prov,true)));
   return out;

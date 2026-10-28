@@ -75,7 +75,7 @@ In Netlify unter **Site configuration → Environment variables** diese Werte an
 Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist. Die Schlüssel verlassen den Server nie.
 
 ### Update: Vertriebspartner und Provisionen (Oktober 2026)
-1. In Supabase `supabase/vertrieb.sql` ausführen (nach `team.sql`). Kontrolle am Ende: 6 Policies auf `docs`, 3 auf `team`.
+1. In Supabase `supabase/vertrieb.sql` ausführen (nach `team.sql`). Kontrolle am Ende: 8 Policies auf `docs`, 3 auf `team`.
 2. In der App unter **Vertrieb → Provisionsmodell** die Absenderdaten für Gutschriften eintragen (Anschrift, Steuer-Nr./USt-ID).
 3. Erst Partner einladen, wenn der Partnervertrag unterschrieben ist.
 

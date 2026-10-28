@@ -10,7 +10,7 @@ create table public.docs (collection text not null, id text not null, data jsonb
 alter table public.docs enable row level security;
 grant select, insert, update, delete on public.docs to authenticated;`);
 await ex(fs.readFileSync(R + 'team.sql', 'utf8'));
-await ex(`grant select, update on public.team to authenticated;`);
+await ex(`grant select, update on public.team to authenticated;`);  // wie Supabase-Standard; vertrieb.sql schränkt ein
 const v = await db.exec(fs.readFileSync(R + 'vertrieb.sql', 'utf8'));
 console.log('Policies:', v.at(-1).rows.map(r => r.tablename + ':' + r.policyname).join(' | '));
 // Daten
@@ -37,6 +37,11 @@ await as('onlion-@outlook.de', async () => {
 });
 await as('marc@x.de', async () => {
   ok('Team-Mitglied (Admin) sieht alle Kunden', (await q(`select id from docs where collection='customers'`)).length === 3);
+  ok('Mitglied kann sich nicht zum Inhaber machen', !(await tryq(`update team set role='owner' where email='marc@x.de'`)) || (await q(`select role from team where email='marc@x.de'`))[0].role === 'member');
+  ok('Mitglied kann Partner nicht zum Admin machen', !(await tryq(`update team set role='member' where email='p1@x.de'`)));
+  ok('Mitglied kann Sperrzeit nicht ändern', !(await tryq(`update team set last_reset=null where email='p1@x.de'`)));
+  ok('Mitglied kann Inhaber-Zeile nicht ändern', (await q(`update team set name='x' where email='onlion-@outlook.de' returning email`)).length === 0);
+  ok('Mitglied kann Partnerdaten pflegen', (await q(`update team set name='P1 neu', kleinunternehmer=true where email='p1@x.de' returning email`)).length === 1);
 });
 await as('p1@x.de', async () => {
   const c = await q(`select id from docs where collection='customers'`);
@@ -53,11 +58,12 @@ await as('p1@x.de', async () => {
   ok('Partner kann Provision nicht ändern', (await q(`update docs set data='{"partner":"p1@x.de","betrag":99999}' where id='r1' returning id`)).length === 0);
   ok('Partner kann Modell nicht ändern', (await q(`update docs set data='{"x":1}' where collection='config' returning id`)).length === 0);
   ok('Partner kann Vorlage nicht ändern', (await q(`update docs set data='{"x":1}' where collection='templates' returning id`)).length === 0);
+  ok('Partner kann eigenen Kunden nicht löschen', (await q(`delete from docs where id='a' returning id`)).length === 0);
   ok('Partner kann Vorschlag anlegen', await tryq(`insert into docs values ('vorschlaege','v1','{"von":"p1@x.de","email":"neu@x.de"}')`));
   ok('Partner kann keinen Vorschlag im fremden Namen anlegen', !(await tryq(`insert into docs values ('vorschlaege','v2','{"von":"p2@x.de"}')`)));
   const t = await q(`select email from team`);
   ok('Partner sieht in der Team-Liste nur sich', t.length === 1 && t[0].email === 'p1@x.de');
-  ok('Partner kann sich nicht zum Admin machen', (await q(`update team set role='owner' where email='p1@x.de' returning email`)).length === 0);
+  ok('Partner kann sich nicht zum Admin machen', !(await tryq(`update team set role='owner' where email='p1@x.de'`)) && !(await tryq(`update team set name='x' where email='p1@x.de' returning email`).then(()=>q(`update team set name='x' where email='p1@x.de' returning email`)).then(r=>r.length>0,()=>false)));
   const s = await q(`select email, ebene from my_structure() order by ebene`);
   ok('Struktur zeigt 2 Ebenen (' + s.map(r => r.email + ':' + r.ebene).join(',') + ')', s.length === 2 && s[0].email === 'p2@x.de' && s[0].ebene === 1 && s[1].email === 'p3@x.de' && s[1].ebene === 2);
   ok('Partner ist kein Admin', (await q(`select public.is_admin() a`))[0].a === false);
@@ -69,6 +75,7 @@ await as('fremd@x.de', async () => {
   ok('Fremdes Konto sieht nichts', (await q(`select id from docs`)).length === 0 && (await q(`select email from team`)).length === 0);
   ok('Fremdes Konto: Struktur leer', (await q(`select * from my_structure()`)).length === 0);
 });
+ok('Werber mit Struktur nicht löschbar', !(await tryq(`delete from team where email='p2@x.de'`)));
 // Zyklus-Schutz: sponsor kann nicht man selbst sein
 ok('Partner kann nicht sein eigener Werber sein', !(await tryq(`update team set sponsor='p1@x.de' where email='p1@x.de'`)));
 // SQL zweimal ausführbar
