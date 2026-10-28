@@ -176,6 +176,8 @@ try:
         inv.wait_for_selector('#pwForm:not([hidden])')
         ok('Einladungslink zeigt „Passwort festlegen“', 'Passwort festlegen' in inv.inner_text('#pw-title') and 'a@b.de' in inv.inner_text('#pw-who'))
         ok('Token aus Adresse entfernt', '#' not in inv.url)
+        inv.reload(); inv.wait_for_selector('#pwForm:not([hidden])')
+        ok('Nach Neuladen weiter „Passwort festlegen“', inv.is_visible('#pw-new'))
         inv.fill('#pw-new', 'PartnerPasswort1'); inv.fill('#pw-rep', 'PartnerPasswort1'); inv.click('#pw-btn')
         inv.wait_for_selector('#login', state='hidden'); inv.wait_for_timeout(300)
         inv.click('#navKonto'); inv.wait_for_selector('#pc-old')

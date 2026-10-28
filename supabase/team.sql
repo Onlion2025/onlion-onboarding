@@ -8,11 +8,14 @@ create table if not exists public.team (
   email     text        primary key check (email = lower(email)),
   role      text        not null default 'member' check (role in ('owner', 'member')),
   user_id   uuid,
+  last_reset timestamptz,
   added_at  timestamptz not null default now()
 );
 alter table public.team enable row level security;
+alter table public.team add column if not exists last_reset timestamptz;
 
--- Inhaber-Konto eintragen
+-- Inhaber-Konto eintragen. Muss die E-Mail deines Supabase-Logins sein und
+-- genau ALLOWED_USER_EMAIL in Netlify entsprechen (sonst hier anpassen).
 insert into public.team (email, role) values ('onlion-@outlook.de', 'owner')
 on conflict (email) do update set role = 'owner';
 

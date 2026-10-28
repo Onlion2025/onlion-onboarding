@@ -35,17 +35,19 @@
     return api;
   }
   let session = null;
+  try { session = JSON.parse(sessionStorage.getItem('mock_session')) || null; } catch (e) {}
+  const keep = () => { try { session ? sessionStorage.setItem('mock_session', JSON.stringify(session)) : sessionStorage.removeItem('mock_session'); } catch (e) {} };
   // Link aus E-Mail nachgebaut: #access_token=…&type=invite&mock_email=…
   const hp = new URLSearchParams(location.hash.replace(/^#/, ''));
-  if (hp.get('access_token')) session = {user:{email: hp.get('mock_email')}, access_token: 'tok'};
+  if (hp.get('access_token')) { session = {user:{email: hp.get('mock_email')}, access_token: 'tok'}; keep(); }
   window.supabase = { createClient(){ return {
     from: q,
     channel(){ return { on(){ return this; }, subscribe(){ return this; } }; },
     auth: {
       async getSession(){ return {data:{session}}; },
       async updateUser({password}){ window.__pwChanges = (window.__pwChanges || 0) + 1; window.__pw = password; return {data:{}, error:null}; },
-      async signInWithPassword({email, password}){ if (password !== window.__pw) return {data:{}, error:{message:'invalid'}}; session = {user:{email}, access_token:'tok'}; return {data:{session}, error:null}; },
-      async signOut(){ session = null; },
+      async signInWithPassword({email, password}){ if (password !== window.__pw) return {data:{}, error:{message:'invalid'}}; session = {user:{email}, access_token:'tok'}; keep(); return {data:{session}, error:null}; },
+      async signOut(){ session = null; keep(); },
       onAuthStateChange(){ return {data:{subscription:{unsubscribe(){}}}}; }
     }
   }; } };

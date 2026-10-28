@@ -27,7 +27,7 @@ global.fetch = async (url, opts = {}) => {
 };
 Object.assign(process.env, {
   SUPABASE_URL: 'https://x.supabase.co', SUPABASE_ANON_KEY: 'anon', BREVO_API_KEY: 'bk', BREVO_SENDER_EMAIL: 'info@onlion.de',
-  OWNER_EMAIL: 'kopie@onlion.de', ALLOWED_USER_EMAIL: 'adam@onlion.de', SUPABASE_SERVICE_ROLE_KEY: 'srk', URL: 'https://kionboarding.netlify.app'
+  OWNER_EMAIL: 'kopie@onlion.de', ALLOWED_USER_EMAIL: 'adam@onlion.de', SUPABASE_SERVICE_ROLE_KEY: 'srk', URL: 'https://kionboarding.netlify.app', RESET_MIN_MS: '0'
 });
 const send = require(path + 'send-pdf.js').handler;
 const teamFn = require(path + 'team.js').handler;
@@ -68,6 +68,7 @@ let pass = 0; const ok = (n, c) => { assert.ok(c, n); pass++; console.log('OK   
   calls = []; existingUsers.push('neu@x.de');
   r = await teamFn(ev({ action: 'invite', email: 'neu@x.de' }));
   ok('Erneut senden: Passwort-Link statt Einladung', r.statusCode === 200 && calls.filter(c => c.url.includes('generate_link')).map(c => JSON.parse(c.opts.body).type).join() === 'invite,recovery');
+  ok('Erneut senden: passender Mailtext', JSON.parse(calls.find(c => c.url.includes('brevo')).opts.body).subject === 'Dein Zugang zur ONLION Onboarding-App');
   r = await teamFn(ev({ action: 'remove', email: 'adam@onlion.de' })); ok('Inhaber nicht entfernbar', r.statusCode === 400);
   calls = []; r = await teamFn(ev({ action: 'remove', email: 'neu@x.de' }));
   ok('Entfernen löscht Team-Eintrag und Login', r.statusCode === 200 && !team.some(t => t.email === 'neu@x.de') && calls.some(c => c.url.endsWith('/auth/v1/admin/users/uid-neu%40x.de') && c.opts.method === 'DELETE'));
@@ -75,6 +76,11 @@ let pass = 0; const ok = (n, c) => { assert.ok(c, n); pass++; console.log('OK   
   // Passwort vergessen
   calls = []; r = await resetFn({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ email: 'partner@x.de' }) });
   ok('Reset für Mitglied sendet Mail', r.statusCode === 200 && calls.some(c => c.url.includes('brevo')) && JSON.parse(calls.find(c => c.url.includes('generate_link')).opts.body).type === 'recovery');
+  calls = []; const r3 = await resetFn({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ email: 'partner@x.de' }) });
+  ok('Reset höchstens alle 5 Minuten', r3.body === r.body && !calls.some(c => c.url.includes('brevo')));
+  process.env.RESET_MIN_MS = '300'; const t0 = Date.now();
+  await resetFn({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ email: 'unbekannt@x.de' }) });
+  ok('Reset-Antwort hat Mindestdauer', Date.now() - t0 >= 290); process.env.RESET_MIN_MS = '0';
   calls = []; const r2 = await resetFn({ httpMethod: 'POST', headers: {}, body: JSON.stringify({ email: 'unbekannt@x.de' }) });
   ok('Reset für Unbekannte: gleiche Antwort, keine Mail', r2.statusCode === 200 && r2.body === r.body && !calls.some(c => c.url.includes('brevo')));
 

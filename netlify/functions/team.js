@@ -28,7 +28,8 @@ exports.handler = async (event) => {
     }
     // 2) Einladungslink erzeugen; gibt es das Konto schon, einen Passwort-Link
     let link = await makeLink('invite', email);
-    if (!link.ok && (link.status === 422 || /already/i.test(link.message))) link = await makeLink('recovery', email);
+    let isRecovery = false;
+    if (!link.ok && (link.status === 422 || /already/i.test(link.message))) { link = await makeLink('recovery', email); isRecovery = true; }
     if (!link.ok) return json(502, { error: 'Supabase konnte keinen Einladungslink erstellen: ' + (link.message || link.status) });
     if (link.userId) {
       await admin('/rest/v1/team?email=eq.' + encodeURIComponent(email), {
@@ -36,10 +37,13 @@ exports.handler = async (event) => {
       }).catch(() => {});
     }
     // 3) Einladung per Brevo senden
-    const mail = await sendLinkMail(email,
-      'Einladung zur ONLION Onboarding-App',
-      'Hallo,\ndu wurdest zur ONLION Onboarding-App für den KI-Telefon-Agenten eingeladen. Über den Button legst du dein eigenes Passwort fest und bist danach angemeldet.',
-      'Passwort festlegen', link.link);
+    const mail = isRecovery
+      ? await sendLinkMail(email, 'Dein Zugang zur ONLION Onboarding-App',
+        'Hallo,\nhier ist ein neuer Link für deinen Zugang zur ONLION Onboarding-App. Über den Button legst du ein neues Passwort fest und bist danach angemeldet.',
+        'Neues Passwort festlegen', link.link)
+      : await sendLinkMail(email, 'Einladung zur ONLION Onboarding-App',
+        'Hallo,\ndu wurdest zur ONLION Onboarding-App für den KI-Telefon-Agenten eingeladen. Über den Button legst du dein eigenes Passwort fest und bist danach angemeldet.',
+        'Passwort festlegen', link.link);
     if (!mail.ok) return json(502, { error: 'Eingetragen, aber die E-Mail wurde nicht versendet: ' + mail.message });
     return json(200, { ok: true });
   }

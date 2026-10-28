@@ -20,7 +20,7 @@ function admin(path, opts = {}) {
 
 // Liest einen Team-Eintrag (Server-Sicht).
 async function teamRow(email) {
-  const r = await admin('/rest/v1/team?select=email,role,user_id&email=eq.' + encodeURIComponent(lc(email)));
+  const r = await admin('/rest/v1/team?select=email,role,user_id,last_reset&email=eq.' + encodeURIComponent(lc(email)));
   if (!r.ok) return null;
   const rows = await r.json().catch(() => []);
   return Array.isArray(rows) && rows[0] ? rows[0] : null;

@@ -13,12 +13,12 @@ Web-App für die Kundenaufnahme. Mit ihr erfasst du Fragenkatalog, Datenschutz u
 2. Region in der EU wählen (Frankfurt oder Irland), Datenbank-Passwort sicher ablegen.
 3. Links **SQL Editor** → **New query** öffnen, den Inhalt von `supabase/schema.sql` einfügen und auf **Run** klicken.
    Das legt die Tabelle und die Startdaten an: Vorlage mit 28 Fragen, Rechtstext-Entwürfe und den Kunden VR-ImmoService.
-4. Danach eine neue Query mit dem Inhalt von `supabase/team.sql` ausführen. Das legt die Team-Liste an und sorgt dafür, dass nur Konten aus dem Team Daten sehen.
+4. Danach eine neue Query mit dem Inhalt von `supabase/team.sql` ausführen. Vorher prüfen: Die E-Mail in der Zeile `insert into public.team` muss deine Login-Adresse sein und genau `ALLOWED_USER_EMAIL` in Netlify entsprechen. Das legt die Team-Liste an und sorgt dafür, dass nur Konten aus dem Team Daten sehen.
 
 ### 2. Login und Team
 1. Unter **Authentication → Sign In / Providers** den Schalter **„Allow new users to sign up“ ausschalten**. Je nach Dashboard-Version kann der Menüpunkt leicht anders heißen.
 2. Unter **Authentication → Users** auf **Add user** klicken, deine E-Mail und ein starkes Passwort eintragen und „Auto confirm“ anhaken.
-3. Unter **Authentication → URL Configuration** als **Site URL** die App-Adresse eintragen (`https://kionboarding.netlify.app`). Dorthin führen die Links aus Einladungs- und Passwort-E-Mails.
+3. Unter **Authentication → URL Configuration** als **Site URL** die App-Adresse eintragen (`https://kionboarding.netlify.app`). Dorthin führen die Links aus Einladungs- und Passwort-E-Mails. Kommt später eine eigene Domain dazu (z. B. `onboarding.onlionapp.de`), diese unter **Redirect URLs** als `https://onboarding.onlionapp.de/**` ergänzen und in Netlify `APP_URL` auf diese Adresse setzen.
 4. Optional unter **Authentication → Providers → Email** die Gültigkeit der E-Mail-Links (Email OTP Expiration) auf bis zu 86400 Sekunden (24 Stunden) erhöhen. Standard ist eine Stunde.
 
 Weitere Personen (z. B. Partner) lädst du in der App unter **Konto & Team** ein. Die Registrierung bleibt aus; niemand kann sich selbst ein Konto anlegen.
@@ -39,6 +39,7 @@ Den **service_role**-Schlüssel nie in die App eintragen.
 Jede spätere Änderung, zum Beispiel an `config.js`, in GitHub speichern. Netlify veröffentlicht dann automatisch neu, das dauert etwa eine Minute.
 
 ### Test
+- Unter **Konto & Team** eine Probeeinladung an eine zweite eigene Adresse schicken, Link öffnen, Passwort festlegen. Danach den Zugang wieder entfernen.
 - Die Netlify-Adresse öffnen. Es erscheint die Anmeldung mit ONLION-Logo.
 - Mit dem Nutzer aus Schritt 2 anmelden. Links sollte der Kunde **VR-ImmoService GmbH** stehen.
 
@@ -69,8 +70,15 @@ In Netlify unter **Site configuration → Environment variables** diese Werte an
 | `SUPABASE_SERVICE_ROLE_KEY` | **service_role**-Schlüssel aus Supabase (Project Settings → API). Nur hier eintragen, als Secret markieren, nie in `config.js`. Wird für Einladungen, „Passwort vergessen?“ und die Team-Prüfung gebraucht. |
 | `OWNER_EMAIL` | deine Adresse für eine Blindkopie jeder Mail |
 | `REPLY_TO_EMAIL` | optional: Adresse für Antworten |
+| `APP_URL` | optional: eigene App-Adresse für Links in E-Mails. Ohne Angabe gilt die Netlify-Adresse. |
 
 Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist. Die Schlüssel verlassen den Server nie.
+
+### Update einer bestehenden Installation (Team-Zugang, Oktober 2026)
+1. In Supabase `supabase/team.sql` ausführen (E-Mail in der Insert-Zeile vorher prüfen).
+2. In Supabase die **Site URL** setzen (siehe Schritt 2.3), optional die Link-Gültigkeit erhöhen (2.4).
+3. In Netlify `SUPABASE_SERVICE_ROLE_KEY` als Secret anlegen und **Trigger deploy** klicken.
+4. Test: wie oben, Probeeinladung schicken.
 
 ---
 
@@ -89,7 +97,7 @@ Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist.
 ## Wichtig
 - Die **Rechtstexte sind Entwürfe**. Lass sie vor dem ersten echten Einsatz anwaltlich prüfen.
 - Schließe mit Supabase einen **Auftragsverarbeitungsvertrag (DPA)** ab. Das geht im Supabase-Dashboard.
-- Ein Backup ist im kostenlosen Supabase-Tarif nicht automatisch enthalten. Für den Dauerbetrieb lohnt sich der Pro-Tarif.
+- Ein Backup ist im Free-Tarif von Supabase nicht automatisch enthalten. Für den Dauerbetrieb lohnt sich der Pro-Tarif.
 
 - Mit **Brevo** ebenfalls einen Auftragsverarbeitungsvertrag abschließen.
 - Die Preise in den Bausteinen sind Startwerte. Pro Kunde lassen sie sich anpassen.
