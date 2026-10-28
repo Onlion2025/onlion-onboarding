@@ -481,43 +481,119 @@ function clean(s){return String(s==null?'':s).replace(/[„“”]/g,'"').replac
 async function imgData(url){const r=await fetch(url);const b=await r.blob();return await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(b);});}
 async function buildPdf(c){
   const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'mm',format:'a4'});
-  const W=210,M=18,CW=W-2*M; let y=0;
+  const W=210,M=18,CW=W-2*M,BOT=276; let y=0;
+  const INK=[28,28,26],MUT=[112,112,104],ACC=[74,102,0],LIME=[200,255,0],SOFT=[245,245,241],LINE=[224,224,216];
+  const T=v=>String(v==null?'':v).replace(/[ \t]+/g,' ').trim();
+  const col=a=>doc.setTextColor(a[0],a[1],a[2]);
+  const font=(sz,st)=>{doc.setFont('helvetica',st||'normal');doc.setFontSize(sz);};
+  const lh=sz=>sz*0.42;
+  const wrap=(t,sz,st,w)=>{font(sz,st);return doc.splitTextToSize(clean(t),w||CW);};
   let logo=null;try{logo=await imgData('logo-black.png');}catch(e){}
-  const head=()=>{if(logo)doc.addImage(logo,'PNG',M,12,34,7,'logo','FAST');doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(110);doc.text(clean('KI-Telefon-Agent · Kundenaufnahme'),W-M,16,{align:'right'});doc.setDrawColor(200,255,0);doc.setLineWidth(1);doc.line(M,23,M+16,23);y=32;doc.setTextColor(28);};
-  const need=hgt=>{if(y+hgt>280){doc.addPage();head();}};
-  const para=(t,size,style,gap)=>{size=size||10;doc.setFont('helvetica',style||'normal');doc.setFontSize(size);const lines=doc.splitTextToSize(clean(t),CW);for(const ln of lines){need(size*0.45);doc.setFont('helvetica',style||'normal');doc.setFontSize(size);doc.setTextColor(28);doc.text(ln,M,y);y+=size*0.45;}y+=gap==null?2:gap;};
+  const firma=T(c.firma)||'Ohne Namen';
+  const head=()=>{
+    if(logo)doc.addImage(logo,'PNG',M,11,30,6.2,'logo','FAST');
+    font(8);col(MUT);doc.text(clean('KI-Telefon-Agent · Kundenaufnahme'),W-M,13.5,{align:'right'});
+    doc.text(clean(firma),W-M,17.5,{align:'right'});
+    doc.setDrawColor(...LINE);doc.setLineWidth(0.2);doc.line(M,22,W-M,22);
+    doc.setDrawColor(...LIME);doc.setLineWidth(1.2);doc.line(M,22,M+18,22);
+    y=31;
+  };
+  const need=hgt=>{if(y+hgt>BOT){doc.addPage();head();return true;}return false;};
+  const lines=(arr,sz,st,c2,x,gap)=>{for(const ln of arr){need(lh(sz));font(sz,st);col(c2||INK);doc.text(ln,x==null?M:x,y);y+=lh(sz);}y+=gap||0;};
+  let secNo=0;
+  const section=(title,minNext)=>{
+    need(14+(minNext||12));secNo++;y+=3;
+    doc.setFillColor(...LIME);doc.roundedRect(M,y-4.6,7,6,1,1,'F');
+    font(9,'bold');col(INK);doc.text(String(secNo).padStart(2,'0'),M+3.5,y-0.4,{align:'center'});
+    font(13.5,'bold');doc.text(clean(title),M+10,y);
+    y+=3;doc.setDrawColor(...LINE);doc.setLineWidth(0.2);doc.line(M,y,W-M,y);y+=6;
+  };
+  const sub=t=>{need(16);font(8,'bold');col(ACC);doc.text(clean(T(t).toUpperCase()),M,y);y+=5;};
+
+  /* Kopf und Deckblatt-Bereich */
   head();
-  para(c.firma||'Ohne Namen',18,'bold',1);
-  para([c.adresse,c.ansprechpartner,c.email,c.telefon].map(v=>String(v||'').replace(/\s+/g,' ').trim()).filter(Boolean).join(' · '),10,'normal',4);
-  para('Fragenkatalog',13,'bold',2);
+  font(8,'bold');col(ACC);doc.text('KUNDENAUFNAHME · KI-TELEFON-AGENT',M,y);y+=8;
+  lines(wrap(firma,22,'bold'),22,'bold',INK,M,2);
+  const p=progress(c);
+  const info=[['Ansprechpartner',T(c.ansprechpartner)],['E-Mail',T(c.email)],['Telefon',T(c.telefon)],['Adresse',T(c.adresse)],['Stand',new Date().toLocaleDateString('de-DE')],['Fortschritt',p.qDone+' von '+p.qTotal+' Fragen beantwortet ('+p.pct+' % gesamt)']];
+  const cw2=(CW-14)/2;
+  const rows=[];for(let i=0;i<info.length;i+=2)rows.push([info[i],info[i+1]]);
+  const rowH=r=>Math.max(...r.map(it=>it?wrap(it[1]||'-',9.5,'normal',cw2).length:1))*lh(9.5)+6;
+  const boxH=rows.reduce((s,r)=>s+rowH(r),0)+6;
+  y+=2;doc.setFillColor(...SOFT);doc.roundedRect(M,y,CW,boxH,2.5,2.5,'F');
+  let by=y+7;
+  for(const r of rows){r.forEach((it,i)=>{if(!it)return;const x=M+5+i*(cw2+4);font(7.5,'bold');col(MUT);doc.text(clean(it[0].toUpperCase()),x,by);font(9.5);col(INK);doc.text(wrap(it[1]||'-',9.5,'normal',cw2),x,by+4.5);});by+=rowH(r);}
+  y+=boxH+4;
+  if(p.openStars.length){font(8.5);col(MUT);lines(wrap('Noch offene Kernfragen (*): Nr. '+p.openStars.join(', '),8.5,'normal'),8.5,'normal',MUT,M,2);}
+
+  /* Fragenkatalog */
+  section('Fragenkatalog',20);
+  const NX=M+9,QW=CW-9;
   for(const s of (S.tpl?S.tpl.sections:[])){
-    para(s.title,11,'bold',1);
-    for(const q of s.questions){const a=(c.answers||{})[q.id]||'';para((allQs().indexOf(q)+1)+'. '+q.text+(q.star?' *':''),9.5,'bold',0.5);para(a||'- offen -',9.5,'normal',2.5);}
+    let first=true;
+    for(const q of s.questions){
+      const a=T((c.answers||{})[q.id]);
+      const ql=wrap(q.text,9.5,'bold',QW),al=wrap(a||'offen',9.5,a?'normal':'italic',QW);
+      const hgt=ql.length*lh(9.5)+1.5+al.length*lh(9.5)+5;
+      if(first){need(hgt+8);sub(s.title);first=false;}else need(hgt);
+      const top=y;const n=allQs().indexOf(q)+1;
+      font(9,'bold');col(q.star?ACC:MUT);doc.text(String(n).padStart(2,'0'),M,y);
+      if(q.star){doc.setFillColor(...LIME);doc.circle(M+5.6,y-1.1,0.9,'F');}
+      lines(ql,9.5,'bold',INK,NX,1.5);
+      lines(al,9.5,a?'normal':'italic',a?[60,60,56]:MUT,NX,0);
+      y+=1.8;doc.setDrawColor(...LINE);doc.setLineWidth(0.15);doc.line(NX,y,W-M,y);y+=4.2;
+    }
+    y+=2;
   }
+  font(7.5);col(MUT);need(6);doc.setFillColor(...LIME);doc.circle(M+0.9,y-1.1,0.9,'F');doc.text('Kernfrage, im Termin zu klären',M+3.5,y);y+=6;
+
+  /* Datenschutz-Angaben */
   const l=c.legal||{};
-  para('Datenschutz-Angaben',13,'bold',2);
-  para('Datenschutzbeauftragter: '+(l.dsb||'- offen -'),9.5);
-  para('Speicherung der Gespräche: '+(l.speicherung||'- offen -'),9.5);
-  para('Verarbeitung nur in der EU: '+(l.eu?'ja':'nein'),9.5);
-  para('Hinweis an Anrufer (KI und Speicherung): '+(l.hinweis?'ja':'nein'),9.5);
-  para('AGB und Datenschutzhinweise erhalten: '+(l.agb?'ja':'nein'),9.5);
-  para('Nennung als Referenz: '+(l.referenz?'ja':'nein'),9.5);
-  if(l.notiz)para('Besondere Vereinbarungen: '+l.notiz,9.5);
-  y+=2;
-  for(const d of legalDocs()){para(d.title,12,'bold',1.5);para(fill(d.body,c),9.5,'normal',3);}
+  section('Datenschutz-Angaben',30);
+  const kv=[['Datenschutzbeauftragter',T(l.dsb)],['Speicherung der Gespräche',T(l.speicherung)]];
+  for(const [k,v] of kv){const vl=wrap(v||'offen',9.5,v?'normal':'italic',CW-80);need(vl.length*lh(9.5)+5);font(9,'bold');col(MUT);doc.text(k,M,y);lines(vl,9.5,v?'normal':'italic',v?INK:MUT,M+80,0);y+=1.8-lh(9.5);doc.setDrawColor(...LINE);doc.setLineWidth(0.15);doc.line(M,y,W-M,y);y+=5;}
+  const yn=[['Verarbeitung nur in der EU',l.eu],['Hinweis an Anrufer (KI und Speicherung)',l.hinweis],['AGB und Datenschutzhinweise erhalten',l.agb],['Nennung als Referenz',l.referenz]];
+  for(const [k,v] of yn){need(8);font(9,'bold');col(MUT);doc.text(k,M,y);
+    if(v){doc.setFillColor(...LIME);doc.roundedRect(M+80,y-3.6,12,5,1.2,1.2,'F');font(8,'bold');col(INK);doc.text('Ja',M+86,y,{align:'center'});}
+    else{doc.setDrawColor(...LINE);doc.setLineWidth(0.3);doc.roundedRect(M+80,y-3.6,12,5,1.2,1.2,'S');font(8,'bold');col(MUT);doc.text('Nein',M+86,y,{align:'center'});}
+    y+=1.8;doc.setDrawColor(...LINE);doc.setLineWidth(0.15);doc.line(M,y,W-M,y);y+=5;}
+  if(T(l.notiz)){need(12);font(9,'bold');col(MUT);doc.text('Besondere Vereinbarungen',M,y);lines(wrap(T(l.notiz),9.5,'normal',CW-80),9.5,'normal',INK,M+80,4);}
+
+  /* Rechtstexte */
+  for(const d of legalDocs()){
+    section(d.title,24);
+    const body=fill(d.body,c).split('\n');
+    for(const raw of body){
+      const t=T(raw);
+      if(!t){y+=2;continue;}
+      if(/^§\s*\d+/.test(t)){need(14);y+=1.5;lines(wrap(t,10,'bold'),10,'bold',INK,M,1.2);}
+      else if(/^(zwischen|und)$/i.test(t)){lines(wrap(t,9,'italic'),9,'italic',MUT,M,1);}
+      else lines(wrap(t,9.5,'normal'),9.5,'normal',[52,52,48],M,1);
+    }
+  }
+
+  /* Unterschriften */
   const sg=c.signature;
-  need(70);para('Unterschriften',13,'bold',3);
+  section('Unterschriften',62);
   if(sg){
-    const sy=y;
-    const ih=r=>Math.min(26,75*(r||0.25));
-    try{doc.addImage(sg.kunde.img,'PNG',M,sy+26-ih(sg.kunde.ratio),75,ih(sg.kunde.ratio),'sigk','FAST');doc.addImage(sg.onlion.img,'PNG',M+CW/2+4,sy+26-ih(sg.onlion.ratio),75,ih(sg.onlion.ratio),'sigo','FAST');}catch(e){}
-    y=sy+28;doc.setDrawColor(40);doc.setLineWidth(0.3);doc.line(M,y,M+75,y);doc.line(M+CW/2+4,y,M+CW/2+79,y);y+=4.5;
-    doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text(clean(sg.kunde.name),M,y);doc.text(clean(sg.onlion.name),M+CW/2+4,y);y+=6;
-    para(sg.ort+', '+fmtDate(sg.signedAt),9.5,'normal',2);
-    para('Prüfsumme SHA-256: '+sg.hash,7.5,'normal',1);
-  } else para('Noch nicht unterschrieben.',10);
+    const bw=(CW-8)/2,bh=44,sy=y;
+    [[sg.kunde,'Verantwortlicher',T(c.firma),M,'sigk'],[sg.onlion,'Auftragsverarbeiter','ONLION',M+bw+8,'sigo']].forEach(([s2,role,org,x,key])=>{
+      doc.setFillColor(...SOFT);doc.roundedRect(x,sy,bw,bh,2.5,2.5,'F');
+      font(7.5,'bold');col(ACC);doc.text(clean(role.toUpperCase()),x+5,sy+6.5);
+      const ih=Math.min(20,(bw-10)*(s2.ratio||0.25)),iw=ih/(s2.ratio||0.25);
+      try{doc.addImage(s2.img,'PNG',x+5,sy+29-ih,Math.min(iw,bw-10),ih,key,'FAST');}catch(e){}
+      doc.setDrawColor(...MUT);doc.setLineWidth(0.25);doc.line(x+5,sy+31,x+bw-5,sy+31);
+      font(9.5,'bold');col(INK);doc.text(clean(T(s2.name)),x+5,sy+36.5);
+      font(8);col(MUT);if(org&&org!==T(s2.name))doc.text(clean(org),x+5,sy+40.5);
+    });
+    y=sy+bh+7;
+    lines(wrap(T(sg.ort)+', '+fmtDate(sg.signedAt),9.5,'normal'),9.5,'normal',INK,M,2);
+    lines(wrap('Prüfsumme SHA-256: '+sg.hash,7,'normal'),7,'normal',MUT,M,1);
+    lines(wrap('Die Prüfsumme belegt, dass der Inhalt seit der Unterschrift nicht verändert wurde.',7,'normal'),7,'normal',MUT,M,1);
+  } else lines(wrap('Noch nicht unterschrieben.',10,'italic'),10,'italic',MUT,M,2);
+
   const pages=doc.getNumberOfPages();
-  for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFontSize(7.5);doc.setTextColor(120);doc.text(clean('ONLION · Rechtstexte: Entwurf, vor Einsatz prüfen lassen'),M,290);doc.text('Seite '+i+' von '+pages,W-M,290,{align:'right'});}
+  for(let i=1;i<=pages;i++){doc.setPage(i);doc.setDrawColor(...LINE);doc.setLineWidth(0.2);doc.line(M,283,W-M,283);font(7.5);col(MUT);doc.text(clean('ONLION · KI-Telefon-Agent · Rechtstexte sind Entwürfe, vor Einsatz prüfen lassen'),M,288);doc.text('Seite '+i+' von '+pages,W-M,288,{align:'right'});}
   return doc.output('blob');
 }
 function blobToBase64(blob){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(',')[1]);fr.onerror=rej;fr.readAsDataURL(blob);});}
@@ -740,7 +816,7 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.s
     if(S.view==='unterschrift'&&!signed(cur())){renderSide();return;}render();});
   db.doc('legal/'+LEGAL_ID).onSnapshot(s=>{
     const a=document.activeElement;if(S.view==='vorlagen'&&a&&a.closest&&a.closest('#view'))return;
-    S.legal=s.exists?JSON.parse(JSON.stringify(s.data())):null;if(S.view==='datenschutz'&&S._drawPreview)S._drawPreview();else if(S.view==='unterschrift'&&!signed(cur()))renderSide();else render();});
+    S.legal=s.exists?JSON.parse(JSON.stringify(s.data())):null;if(S.legal&&JSON.stringify(S.legal).includes('fragt er, ob')){S.legal=JSON.parse(JSON.stringify(S.legal).split('fragt er, ob').join('fragt der Assistent, ob'));db.doc('legal/'+LEGAL_ID).set(S.legal).catch(()=>{});}if(S.view==='datenschutz'&&S._drawPreview)S._drawPreview();else if(S.view==='unterschrift'&&!signed(cur()))renderSide();else render();});
 })();
 })();
 </script>
