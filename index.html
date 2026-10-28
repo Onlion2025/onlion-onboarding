@@ -776,7 +776,8 @@ function viewKonto(){
   // Team
   const team=h('section',{class:'card'},h('h2',null,'Team'),
     h('p',{style:'margin:0;max-width:70ch'},'Alle im Team sehen dieselben Kunden, Vorlagen und Rechtstexte, können Kundenakten bearbeiten, unterschreiben lassen und PDFs versenden. '+(owner?'Einladen und Entfernen kannst nur du als Inhaber.':'Einladen und Entfernen kann nur das Inhaber-Konto.')));
-  if(!S.team.length)team.append(h('div',{class:'eyebrow'},'Team-Liste wird geladen …'));
+  if(S.teamError)team.append(h('div',{class:'banner warn'},'Die Team-Liste ist noch nicht eingerichtet. Bitte in Supabase supabase/team.sql ausführen und die Seite neu laden.'));
+  else if(!S.team.length)team.append(h('div',{class:'eyebrow'},'Team-Liste wird geladen …'));
   for(const m of S.team){
     const row=h('div',{class:'member'},h('div',{class:'who'},m.email,h('span',{class:'tag'+(m.role==='owner'?' lime':'')},m.role==='owner'?'Inhaber':'Mitglied')));
     if(owner&&m.role!=='owner'){
@@ -947,7 +948,8 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.s
   try{await loadTeam();}catch(e){S.team=[];S.teamError=true;}
   const meRow=S.team.find(m=>String(m.email).toLowerCase()===myMail);
   S.me={email:myMail,role:meRow?meRow.role:'member'};
-  if(!meRow){S.blocked=true;S.loaded=true;render();return;}
+  // Team-Liste noch nicht eingerichtet: App läuft weiter, den Datenschutz übernimmt die Datenbank-Policy
+  if(!meRow&&!S.teamError){S.blocked=true;S.loaded=true;render();return;}
   sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT')location.reload();});
   const db=makeDb(sb);
   S.db=db;S.dl=browserDownloads;

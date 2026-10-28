@@ -190,6 +190,14 @@ try:
         fr_.wait_for_selector('h1:has-text("Kein Zugriff")')
         ok('Fremdes Konto sieht „Kein Zugriff“', fr_.is_hidden('#custGroup') and fr_.is_hidden('#navKonto'))
 
+        # Team-Tabelle fehlt noch: App läuft weiter
+        nt, _ = fresh('http://localhost:8765/index.html')
+        nt.add_init_script("window.__teamBroken=true")
+        nt.goto('http://localhost:8765/index.html'); nt.wait_for_selector('#loginForm')
+        nt.fill('#lg-mail', 'adam@test.de'); nt.fill('#lg-pw', 'richtig'); nt.click('#lg-btn'); nt.wait_for_timeout(500)
+        ok('Ohne team.sql weiter nutzbar', nt.is_visible('#custGroup') and 'Kein Zugriff' not in nt.inner_text('#view'))
+        nt.click('#navKonto'); nt.wait_for_selector('text=noch nicht eingerichtet')
+
         # Passwort vergessen
         fg, fgc = fresh('http://localhost:8765/index.html')
         fg.wait_for_selector('#loginForm'); fg.click('#lg-forgot'); fg.wait_for_selector('text=Bitte zuerst oben deine E-Mail')

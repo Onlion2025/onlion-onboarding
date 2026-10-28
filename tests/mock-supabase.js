@@ -8,6 +8,7 @@
     if (table === 'team') {
       // RLS nachgebaut: nur Team-Mitglieder sehen die Team-Liste
       const api = { select(){ return api; }, then(res, rej){
+        if (window.__teamBroken) return Promise.resolve({data: null, error: {message: 'relation "public.team" does not exist'}}).then(res, rej);
         const me = session && String(session.user.email).toLowerCase();
         const vis = window.__team.some(m => m.email === me) ? JSON.parse(JSON.stringify(window.__team)) : [];
         return Promise.resolve({data: vis, error: null}).then(res, rej);
