@@ -10,7 +10,7 @@ Web-App für die Kundenaufnahme. Mit ihr erfasst du Fragenkatalog, Datenschutz u
 
 ### 1. Supabase-Projekt anlegen
 1. Auf supabase.com ein Konto anlegen und dann **New project** wählen.
-2. **Region: Central EU (Frankfurt)** wählen, Datenbank-Passwort sicher ablegen.
+2. Region in der EU wählen (Frankfurt oder Irland), Datenbank-Passwort sicher ablegen.
 3. Links **SQL Editor** → **New query** öffnen, den Inhalt von `supabase/schema.sql` einfügen und auf **Run** klicken.
    Das legt die Tabelle, den Zugriffsschutz und die Startdaten an: Vorlage mit 28 Fragen, Rechtstext-Entwürfe und den Kunden VR-ImmoService.
 
