@@ -544,7 +544,7 @@ function viewPdf(c){
     }catch(e){status.textContent=e&&e.code==='declined'?'Speichern abgebrochen.':'Fehler: '+(e&&e.message||e);}
     btn.disabled=false;
   }},'PDF speichern');
-  const greet=c.ansprechpartner?'Guten Tag '+c.ansprechpartner+',':'Guten Tag,';
+  const ap=String(c.ansprechpartner||'').replace(/\s+/g,' ').trim();const greet=ap?'Guten Tag '+ap+',':'Guten Tag,';
   const mailStatus=h('div',{class:'eyebrow'});
   const send=h('button',{type:'button',class:'btn primary',onclick:async()=>{
     const to=document.getElementById('m-to').value.trim();
