@@ -15,7 +15,7 @@ Web-App für die Kundenaufnahme. Mit ihr erfasst du Fragenkatalog, Datenschutz u
    Das legt die Tabelle, den Zugriffsschutz und die Startdaten an: Vorlage mit 28 Fragen, Rechtstext-Entwürfe und den Kunden VR-ImmoService.
 
 ### 2. Login nur für dich
-1. Unter **Authentication** in den Einstellungen der Anmeldung **neue Registrierungen ausschalten** („Allow new users to sign up“ aus).
+1. Unter **Authentication → Sign In / Providers** den Schalter **„Allow new users to sign up“ ausschalten**. Je nach Dashboard-Version kann der Menüpunkt leicht anders heißen.
 2. Unter **Authentication → Users** auf **Add user** klicken, deine E-Mail und ein starkes Passwort eintragen und „Auto confirm“ anhaken.
 
 ### 3. Zugang in die App eintragen
@@ -26,9 +26,21 @@ Web-App für die Kundenaufnahme. Mit ihr erfasst du Fragenkatalog, Datenschutz u
 Den **service_role**-Schlüssel nie in die App eintragen.
 
 ### 4. GitHub und Netlify
-1. Das Repository `Onlion2025/onlion-onboarding` mit diesen Dateien befüllen.
-2. In Netlify **Add new site → Import from GitHub** wählen und das Repository auswählen. Build-Befehl leer lassen, Publish-Verzeichnis `.`.
-3. Optional unter **Domain management** die Adresse `onboarding.onlionapp.de` einrichten.
+1. Auf github.com im Konto **Onlion2025** auf **New repository** klicken. Name `onlion-onboarding` eintragen, **Private** wählen und das Repository anlegen.
+2. Dort auf **uploading an existing file** klicken, alle Dateien aus diesem Ordner hineinziehen (inklusive Ordner `supabase`) und **Commit changes** klicken.
+3. In Netlify **Add new site → Import an existing project → GitHub** wählen und `onlion-onboarding` auswählen. Build-Befehl leer lassen, Publish-Verzeichnis `.`, dann **Deploy**.
+4. Optional unter **Domain management** die Adresse `onboarding.onlionapp.de` einrichten.
+
+Jede spätere Änderung, zum Beispiel an `config.js`, in GitHub speichern. Netlify veröffentlicht dann automatisch neu, das dauert etwa eine Minute.
+
+### Test
+- Die Netlify-Adresse öffnen. Es erscheint die Anmeldung mit ONLION-Logo.
+- Mit dem Nutzer aus Schritt 2 anmelden. Links sollte der Kunde **VR-ImmoService GmbH** stehen.
+
+### Fehlersuche
+- **„Einrichtung fehlt“:** `config.js` ist noch nicht ausgefüllt oder noch nicht neu veröffentlicht.
+- **„Anmeldung fehlgeschlagen“:** E-Mail oder Passwort falsch, oder der Nutzer ist nicht bestätigt („Auto confirm“).
+- **Keine Kunden, keine Fragen:** `supabase/schema.sql` wurde nicht oder nicht vollständig ausgeführt.
 
 ### 5. Auf dem iPad installieren
 Die Adresse in **Safari** öffnen, dann **Teilen → Zum Home-Bildschirm**. Die App startet danach im Vollbild mit ONLION-Symbol.

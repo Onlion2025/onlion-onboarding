@@ -584,6 +584,7 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.s
   document.getElementById('logoutBtn').addEventListener('click',async()=>{await sb.auth.signOut();location.reload();});
   const {data:{session}}=await sb.auth.getSession();
   if(!session)await loginFlow(sb);
+  sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT')location.reload();});
   const db=makeDb(sb);
   S.db=db;S.dl=browserDownloads;
   db.collection('customers').orderBy('createdAt','desc').onSnapshot(snap=>{
