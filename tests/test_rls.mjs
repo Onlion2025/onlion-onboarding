@@ -19,7 +19,7 @@ insert into team(email,role,sponsor,name) values ('p1@x.de','partner',null,'P1')
 insert into team(email,role,status) values ('weg@x.de','partner','inaktiv');
 insert into docs values ('customers','a','{"firma":"A","partner":"p1@x.de"}'),('customers','b','{"firma":"B","partner":"p2@x.de"}'),('customers','c','{"firma":"C"}'),
  ('templates','t','{}'),('legal','l','{}'),('config','provision','{}'),('zahlungen','z1','{"partner":"p1@x.de"}'),
- ('provisionen','r1','{"partner":"p1@x.de"}'),('provisionen','r2','{"partner":"p2@x.de"}'),('gutschriften','g1','{"partner":"p1@x.de"}');`);
+ ('intern','kosten','{"fixkosten":4000}'),('provisionen','r1','{"partner":"p1@x.de"}'),('provisionen','r2','{"partner":"p2@x.de"}'),('gutschriften','g1','{"partner":"p1@x.de"}');`);
 let pass = 0, fail = 0;
 const ok = (n, c) => { console.log((c ? 'OK   ' : 'FAIL ') + n); c ? pass++ : fail++; };
 async function as(email, fn) {
@@ -31,6 +31,7 @@ const tryq = async s => { try { await db.query(s); return true; } catch (e) { re
 
 await as('onlion-@outlook.de', async () => {
   ok('Inhaber sieht alle Kunden', (await q(`select id from docs where collection='customers'`)).length === 3);
+  ok('Inhaber sieht Kostenmodell', (await q(`select id from docs where collection='intern'`)).length === 1);
   ok('Inhaber sieht Zahlungen', (await q(`select id from docs where collection='zahlungen'`)).length === 1);
   ok('Inhaber sieht ganze Team-Liste', (await q(`select email from team`)).length === 7);
   ok('Inhaber kann Partner ändern', await tryq(`update team set name='Neu' where email='p1@x.de'`));
@@ -46,6 +47,7 @@ await as('marc@x.de', async () => {
 await as('p1@x.de', async () => {
   const c = await q(`select id from docs where collection='customers'`);
   ok('Partner sieht nur eigenen Kunden', c.length === 1 && c[0].id === 'a');
+  ok('Partner sieht Kostenmodell nicht', (await q(`select id from docs where collection='intern'`)).length === 0);
   ok('Partner sieht keine Zahlungen', (await q(`select id from docs where collection='zahlungen'`)).length === 0);
   const p = await q(`select id from docs where collection in ('provisionen','gutschriften')`);
   ok('Partner sieht nur eigene Provisionen/Gutschriften', p.length === 2 && p.every(r => ['r1', 'g1'].includes(r.id)));

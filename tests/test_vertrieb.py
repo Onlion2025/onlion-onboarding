@@ -56,7 +56,7 @@ try:
         a.fill('#ab-a', 'Musterstraße 1, 91161 Hilpoltstein'); a.click('section:has(#ab-a) >> button:has-text("Speichern")'); a.wait_for_timeout(300)
         ok('Absender gespeichert', a.evaluate("()=>[...__rows.values()].find(r=>r.collection==='config').data.absender.adresse").startswith('Musterstraße'))
         a.fill('#ko-fixkosten', '4000'); a.click('section:has(#ko-fixkosten) >> button:has-text("Speichern")'); a.wait_for_timeout(300)
-        ok('Kostenmodell gespeichert', a.evaluate("()=>[...__rows.values()].find(r=>r.collection==='config').data.kosten.fixkosten") == 4000)
+        ok('Kostenmodell getrennt gespeichert', a.evaluate("()=>[...__rows.values()].find(r=>r.collection==='intern').data.fixkosten") == 4000 and a.evaluate("()=>!('kosten' in [...__rows.values()].find(r=>r.collection==='config').data)"))
         a.screenshot(path=T + '/v-modell.png', full_page=True)
         # Kunde von p2 (damit p2 aktiv ist), dann Kunde von p3
         new_customer(a, 'Zwei GmbH', 'p2@x.de')
@@ -142,6 +142,13 @@ try:
         a.set_viewport_size({'width': 1194, 'height': 900}); a.click('#navDash'); a.wait_for_selector('text=Ziel & Kostendeckung')
         g = a.inner_text('section:has-text("Ziel & Kostendeckung")')
         ok('Dashboard: Ziel & Kostendeckung (1 aktiver Kunde, Fixkosten 4.500 € inkl. Plattform)', 'Kostendeckung' in g and '4.500' in g and 'Prognose' in g)
+        hs = a.evaluate("()=>[...document.querySelectorAll('section.card .kpis .kpi')].map(e=>Math.round(e.getBoundingClientRect().height)+'x'+Math.round(e.getBoundingClientRect().width))")
+        ok('Ziel-Karte: gleich große Kacheln (%s)' % ', '.join(hs), len(hs) == 6 and len(set(hs)) == 1)
+        a.set_viewport_size({'width': 390, 'height': 844}); a.wait_for_timeout(250)
+        hs = a.evaluate("()=>[...document.querySelectorAll('section.card .kpis .kpi')].map(e=>Math.round(e.getBoundingClientRect().height)+'x'+Math.round(e.getBoundingClientRect().width))")
+        ok('Ziel-Karte Handy: gleich groß, kein Abschneiden (%s)' % ', '.join(hs), len(set(hs)) == 1 and a.evaluate("()=>[...document.querySelectorAll('section.card .kpis .kn')].every(e=>e.scrollWidth<=e.clientWidth+1)"))
+        a.screenshot(path=T + '/v-dashboard-handy.png', full_page=True)
+        a.set_viewport_size({'width': 1194, 'height': 900}); a.wait_for_timeout(200)
         a.screenshot(path=T + '/v-dashboard.png', full_page=True)
         # Partner-Sicht
         pp = page_for(ctx, TEAM, rows); login(pp, 'p3@x.de')
