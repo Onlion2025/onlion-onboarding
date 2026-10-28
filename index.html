@@ -73,14 +73,14 @@ input:disabled,textarea:disabled,select:disabled{opacity:.6}
 .check input{width:20px;height:20px;margin-top:1px;accent-color:var(--accent-ink);flex:none}
 .stages{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;list-style:none;margin:0;padding:0}
 .stages>li{display:flex;min-width:0}
-.stage{border-radius:16px;padding:18px;min-height:170px;height:100%;display:flex;flex-direction:column;justify-content:flex-start;gap:8px;background:var(--panel);border:1px solid var(--line);text-align:left;cursor:pointer;color:var(--fg);width:100%}
+.stage{border-radius:16px;padding:16px;min-height:170px;height:100%;display:flex;flex-direction:column;justify-content:flex-start;gap:8px;background:var(--panel);border:1px solid var(--line);text-align:left;cursor:pointer;color:var(--fg);width:100%}
 .stage:hover{border-color:var(--line-strong)}
 .stage.done{background:var(--lime);color:var(--lime-ink);border-color:var(--lime)}
 .stage.now{border-color:var(--accent-ink);box-shadow:inset 0 0 0 1px var(--accent-ink)}
 .stage.locked{opacity:.55;cursor:default}
 .stage .k{font-size:12px;font-weight:700;letter-spacing:.06em}
-.stage .t{font-size:18px;font-weight:800}
-.stage .d{font-size:13px;line-height:1.4}
+.stage .t{font-size:clamp(15px,1.35vw,18px);font-weight:800;line-height:1.25;overflow-wrap:break-word;hyphens:auto}
+.stage .d{font-size:13px;line-height:1.4;overflow-wrap:break-word;hyphens:auto}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
 .chip{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--line-strong);background:var(--panel);color:var(--fg);cursor:pointer;font-size:13px}
 .chip.on{background:var(--lime);color:var(--lime-ink);border-color:var(--lime);font-weight:600}
@@ -262,7 +262,7 @@ function header(c,title){
 function lockedBanner(c){return signed(c)?h('div',{class:'banner ok'},'Unterschrieben am '+fmtDate(c.signature.signedAt)+'. Änderungen sind gesperrt. Zum Ändern unter „Unterschrift“ eine neue Version starten.'):null;}
 
 function viewStart(c){
-  const stages=h('ol',{class:'stages','aria-label':'Ablauf'});
+  const stages=h('ol',{class:'stages','aria-label':'Ablauf',lang:'de'});
   STAGES.forEach((st,i)=>{
     const state=stageState(c,st.id);
     let d='';
