@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ONLION Onboarding</title>
+<meta name="theme-color" content="#0e0e0e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ONLION">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:wght@400;600&display=swap">
+<style>
+/* Layout: ONLION-Cockpit – Seitenleiste (Kunden, Ablauf) + Arbeitsfläche; Formular + Live-Dokument nebeneinander */
+:root{
+  --bg:#0e0e0e; --panel:#161616; --panel2:#1d1d1d; --line:#2a2a2a; --fg:#f2f2f0; --muted:#a8a8a3;
+  --lime:#c8ff00; --lime-ink:#0e0e0e; --warn:#ffb347; --ok:#7ee08a;
+  --paper:#ffffff; --ink:#1c1c1c; --ink-muted:#5f5b55;
+  --sans:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.45}
+*{box-sizing:border-box}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--lime);outline-offset:2px}
+.app{display:flex;flex-wrap:wrap;min-height:100%}
+.side{flex:1 1 250px;max-width:280px;background:var(--panel);border-right:1px solid var(--line);padding-block:24px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:18px;display:flex;flex-direction:column;gap:24px}
+.main{flex:999 1 560px;min-width:0;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.main-inner{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:22px;padding-inline:clamp(0px,2vw,24px)}
+.brand img{width:150px;display:block}
+.brand .prod{color:var(--lime);font-weight:600;font-size:15px;margin-top:6px}
+.label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.group{display:flex;flex-direction:column;gap:6px}
+.navbtn{display:block;width:100%;text-align:left;min-height:44px;padding:10px 12px;border-radius:10px;border:0;background:transparent;color:#d6d6d2;cursor:pointer}
+.navbtn:hover{background:var(--panel2)}
+.navbtn.on{background:var(--lime);color:var(--lime-ink);font-weight:700}
+.navbtn small{display:block;font-size:12px;opacity:.75;font-weight:400}
+.step{display:flex;gap:10px;align-items:center}
+.dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--muted);flex:none}
+.dot.done{background:var(--lime);border-color:var(--lime)}
+.dot.now{border-color:var(--lime)}
+.btn{min-height:46px;padding:0 20px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer;font-weight:500}
+.btn:hover{border-color:#4a4a4a}
+.btn.primary{background:var(--lime);color:var(--lime-ink);border:0;font-weight:700}
+.btn.primary:disabled{opacity:.35;cursor:not-allowed}
+.btn.ghost-dashed{border-style:dashed;color:var(--lime);width:100%}
+.btn.danger{color:#ff9b8a;border-color:#5a2a24}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.spacer{flex:1}
+h1{margin:0;font-size:clamp(26px,3vw,34px);font-weight:800;letter-spacing:-.01em;text-wrap:balance}
+h2{margin:0;font-size:20px;font-weight:700;text-wrap:balance}
+.eyebrow{font-size:13px;color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label{font-size:13px;font-weight:600}
+.login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px;z-index:30}
+.login-card{width:min(420px,100%)}
+input[type=text],input[type=email],input[type=tel],input[type=password],textarea,select{background:var(--bg);border:1px solid #333;border-radius:10px;padding:11px 12px;min-height:44px;width:100%}
+textarea{min-height:76px;resize:vertical}
+input:disabled,textarea:disabled,select:disabled{opacity:.6}
+.check{display:flex;gap:10px;align-items:flex-start;min-height:44px;padding-block:6px}
+.check input{width:20px;height:20px;margin-top:1px;accent-color:var(--lime);flex:none}
+.stages{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;list-style:none;margin:0;padding:0}
+.stage{border-radius:16px;padding:18px;min-height:170px;display:flex;flex-direction:column;gap:8px;background:var(--panel);border:1px solid var(--line);text-align:left;cursor:pointer;color:var(--fg);width:100%}
+.stage:hover{border-color:#4a4a4a}
+.stage.done{background:var(--lime);color:var(--lime-ink);border-color:var(--lime)}
+.stage.now{border:2px solid var(--lime)}
+.stage.locked{opacity:.55;cursor:default}
+.stage .k{font-size:12px;font-weight:700;letter-spacing:.06em}
+.stage .t{font-size:18px;font-weight:800}
+.stage .d{font-size:13px;line-height:1.4}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid #333;background:transparent;color:#d6d6d2;cursor:pointer;font-size:13px}
+.chip.on{background:var(--lime);color:var(--lime-ink);border-color:var(--lime);font-weight:600}
+.q{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.q.star{border-color:#4d5f12}
+.q label{font-weight:600}
+.star-mark{color:var(--lime)}
+.progress{width:180px;height:8px;background:#262626;border-radius:4px;overflow:hidden}
+.progress>div{height:100%;background:var(--lime)}
+.tabnum{font-variant-numeric:tabular-nums}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:18px;align-items:start}
+.paper{background:var(--paper);color:var(--ink);border-radius:6px;padding:clamp(20px,4vw,44px);font-family:var(--serif);font-size:14px;line-height:1.6;box-shadow:0 4px 24px rgba(0,0,0,.45);max-height:78vh;overflow:auto}
+.paper .ph{display:flex;justify-content:space-between;align-items:center;font-family:var(--sans);font-size:11px;color:var(--ink-muted);gap:10px;flex-wrap:wrap}
+.paper .ph img{width:90px}
+.paper .bar{height:3px;width:48px;background:var(--lime);margin:12px 0}
+.paper pre{white-space:pre-wrap;font-family:inherit;margin:0}
+.banner{border-radius:12px;padding:12px 16px;font-size:14px;border:1px solid}
+.banner.warn{border-color:#6b4a14;background:#211a0d;color:#ffd79a}
+.banner.ok{border-color:#2f5f36;background:#0f1d11;color:#b8f2bf}
+.banner.info{border-color:#3a3a3a;background:var(--panel2);color:#d6d6d2}
+.pad-wrap{display:flex;flex-direction:column;gap:8px}
+canvas.pad{width:100%;height:170px;background:#fbfbf8;border-radius:12px;touch-action:none;cursor:crosshair;display:block}
+.sigimg{background:#fbfbf8;border-radius:10px;max-width:320px;width:100%}
+.empty{border:1px dashed #3a3a3a;border-radius:16px;padding:28px;color:var(--muted);display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--lime);color:var(--lime-ink);padding:12px 16px;border-radius:12px;font-weight:600;z-index:20}
+.tpl-q{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;word-break:break-all;color:var(--muted)}
+.confirm{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#24110e;border:1px solid #5a2a24;border-radius:12px;padding:10px 12px}
+@media (max-width:860px){.split{grid-template-columns:minmax(0,1fr)}.side{max-width:none;flex-basis:100%;border-right:0;border-bottom:1px solid var(--line)}.paper{max-height:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="login" id="login" hidden>
+  <form class="card login-card" id="loginForm">
+    <img src="logo-white.png" alt="ONLION" style="width:170px">
+    <div class="eyebrow" style="color:var(--lime);font-weight:600">KI-Telefon-Agent · Onboarding</div>
+    <div class="field"><label for="lg-mail">E-Mail</label><input type="email" id="lg-mail" autocomplete="username" required></div>
+    <div class="field"><label for="lg-pw">Passwort</label><input type="password" id="lg-pw" autocomplete="current-password" required></div>
+    <div id="lg-err" class="banner warn" hidden></div>
+    <button class="btn primary" type="submit" id="lg-btn">Anmelden</button>
+  </form>
+</div>
+<div class="app">
+  <nav class="side" aria-label="Navigation">
+    <div class="brand"><img src="logo-white.png" alt="ONLION"><div class="prod" id="prodName">KI-Telefon-Agent</div></div>
+    <div class="group">
+      <div class="label">Kunden</div>
+      <div id="custList"></div>
+      <div id="newCustBox"></div>
+    </div>
+    <div class="group" id="flowNav" hidden>
+      <div class="label">Ablauf</div>
+      <div id="flowList"></div>
+    </div>
+    <div class="group">
+      <div class="label">Einstellungen</div>
+      <button class="navbtn" id="navTpl" type="button">Vorlagen &amp; Rechtstexte</button>
+      <button class="navbtn" id="logoutBtn" type="button">Abmelden</button>
+    </div>
+  </nav>
+  <main class="main"><div class="main-inner" id="view"></div></main>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+(function(){
+const TPL_ID='ki-telefon-agent', LEGAL_ID='ki-telefon-agent';
+const STAGES=[
+  {id:'fragen',t:'Fragenkatalog'},
+  {id:'datenschutz',t:'Datenschutz & AVV'},
+  {id:'unterschrift',t:'Unterschrift'},
+  {id:'pdf',t:'PDF'},
+  {id:'angebot',t:'Angebot & Rechnung'}
+];
+const STORAGE_OPTS=['Nur als Text, 90 Tage','Audio und Text, 30 Tage','Nicht speichern'];
+const S={db:null,dl:null,customers:[],tpl:null,legal:null,curId:null,view:'start',section:0,newOpen:false,loaded:false,pendingRender:false,confirm:null,pads:{}};
+
+function h(tag,attrs,...kids){
+  const el=document.createElement(tag);
+  if(attrs)for(const k in attrs){
+    const v=attrs[k]; if(v==null||v===false)continue;
+    if(k==='class')el.className=v;
+    else if(k==='text')el.textContent=v;
+    else if(k.startsWith('on'))el.addEventListener(k.slice(2),v);
+    else if(k==='value')el.value=v;
+    else if(k==='checked')el.checked=!!v;
+    else if(k==='disabled')el.disabled=!!v;
+    else el.setAttribute(k,v===true?'':v);
+  }
+  for(const c of kids.flat()){ if(c==null||c===false)continue; el.append(c.nodeType?c:document.createTextNode(String(c))); }
+  return el;
+}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2600);}
+function cur(){return S.customers.find(c=>c.id===S.curId)||null;}
+function allQs(){return S.tpl?S.tpl.sections.flatMap(s=>s.questions):[];}
+function answeredCount(c){const a=c.answers||{};return allQs().filter(q=>(a[q.id]||'').trim()).length;}
+function legalOk(c){const l=c.legal||{};return !!(l.dsb&&l.speicherung&&l.hinweis&&l.agb);}
+function signed(c){return !!(c&&c.signature&&c.signature.hash);}
+function stageState(c,id){
+  const total=allQs().length,n=answeredCount(c);
+  if(id==='fragen')return total&&n===total?'done':(n?'now':'open');
+  if(id==='datenschutz')return legalOk(c)?'done':((c.legal&&Object.keys(c.legal).length)?'now':'open');
+  if(id==='unterschrift')return signed(c)?'done':'open';
+  if(id==='pdf')return c.pdfAt?'done':'open';
+  return 'locked';
+}
+function fmtDate(iso){try{return new Date(iso).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'});}catch(e){return iso;}}
+function fill(text,c){
+  const l=c.legal||{}, today=new Date().toLocaleDateString('de-DE');
+  const map={firma:c.firma||'[Firma]',adresse:c.adresse||'[Adresse]',vertreter:c.ansprechpartner||'[Ansprechpartner]',dsb:l.dsb||'[Datenschutzbeauftragter]',speicherung:l.speicherung||'[Speicherung]',datum:today};
+  return String(text||'').replace(/\{\{\s*(\w+)\s*\}\}/g,(m,k)=>k in map?map[k]:m);
+}
+
+/* ---------- writes ---------- */
+const timers={};
+function deepMerge(t,p){for(const k in p){const v=p[k];if(v&&typeof v==='object'&&!Array.isArray(v)){if(!t[k]||typeof t[k]!=='object')t[k]={};deepMerge(t[k],v);}else t[k]=v;}return t;}
+function saveCust(id,patch,delay){
+  if(!S.db)return;
+  const top=Object.keys(patch)[0],sub=patch[top]&&typeof patch[top]==='object'?Object.keys(patch[top])[0]:'';
+  const key=id+'|'+top+'|'+sub;
+  const local=S.customers.find(c=>c.id===id);if(local)deepMerge(local,JSON.parse(JSON.stringify(patch)));
+  if(timers[key])clearTimeout(timers[key].t);
+  const run=()=>{delete timers[key];return S.db.doc('customers/'+id).update(Object.assign({updatedAt:new Date().toISOString()},patch)).catch(e=>toast('Nicht gespeichert: '+(e&&e.message||e)));};
+  timers[key]={t:setTimeout(run,delay==null?500:delay),run};
+}
+function flushAll(){const ps=[];for(const k in timers){clearTimeout(timers[k].t);ps.push(timers[k].run());}return Promise.all(ps);}
+async function createCustomer(data){
+  const now=new Date().toISOString();
+  const ref=S.db.collection('customers').doc();
+  await ref.set(Object.assign({product:'KI-Telefon-Agent',templateId:TPL_ID,answers:{},legal:{},createdAt:now,updatedAt:now},data));
+  S.curId=ref.id;S.view='start';S.newOpen=false;render();
+}
+
+/* ---------- sidebar ---------- */
+function renderSide(){
+  const list=document.getElementById('custList');list.replaceChildren();
+  if(!S.loaded)list.append(h('div',{class:'eyebrow',text:'Lade Kunden …'}));
+  for(const c of S.customers){
+    list.append(h('button',{type:'button',class:'navbtn'+(c.id===S.curId&&S.view!=='vorlagen'?' on':''),onclick:()=>{S.curId=c.id;S.view='start';render();}},c.firma||'Ohne Namen',h('small',null,signed(c)?'unterschrieben':(answeredCount(c)+' von '+allQs().length+' Fragen'))));
+  }
+  const nb=document.getElementById('newCustBox');nb.replaceChildren();
+  if(!S.db){nb.append(h('div',{class:'eyebrow',text:'Speichern ist in dieser Ansicht nicht verfügbar.'}));}
+  else if(!S.newOpen){nb.append(h('button',{type:'button',class:'btn ghost-dashed',onclick:()=>{S.newOpen=true;renderSide();setTimeout(()=>{const f=document.getElementById('nc-firma');f&&f.focus();},0);}},'+ Neuer Kunde'));}
+  else{
+    const form=h('form',{class:'card',style:'padding:14px;gap:10px',onsubmit:e=>{e.preventDefault();const v=document.getElementById('nc-firma').value.trim();if(!v){toast('Bitte einen Firmennamen eintragen.');return;}createCustomer({firma:v});}},
+      h('div',{class:'field'},h('label',{for:'nc-firma'},'Firma'),h('input',{type:'text',id:'nc-firma',autocomplete:'organization'})),
+      h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Anlegen'),h('button',{type:'button',class:'btn',onclick:()=>{S.newOpen=false;renderSide();}},'Abbrechen')));
+    nb.append(form);
+  }
+  const fn=document.getElementById('flowNav'),fl=document.getElementById('flowList'),c=cur();
+  fn.hidden=!c||S.view==='vorlagen';fl.replaceChildren();
+  if(c&&S.view!=='vorlagen'){
+    fl.append(h('button',{type:'button',class:'navbtn'+(S.view==='start'?' on':''),onclick:()=>{S.view='start';render();}},'Übersicht'));
+    STAGES.forEach((st,i)=>{
+      const state=stageState(c,st.id);
+      fl.append(h('button',{type:'button',class:'navbtn'+(S.view===st.id?' on':''),disabled:state==='locked',onclick:()=>{S.view=st.id;render();}},h('span',{class:'step'},h('span',{class:'dot '+(state==='done'?'done':state==='now'?'now':'')}),(i+1)+' · '+st.t)));
+    });
+  }
+  document.getElementById('navTpl').className='navbtn'+(S.view==='vorlagen'?' on':'');
+}
+
+/* ---------- views ---------- */
+function viewEmpty(){
+  return h('div',{class:'empty'},
+    h('h1',null,'KI-Telefon-Agent · Kundenaufnahme'),
+    h('p',{style:'margin:0;max-width:60ch'},'Hier entstehen deine Kundenakten: Fragenkatalog, Datenschutz, Unterschrift und PDF. Lege links mit „Neuer Kunde“ den ersten Kunden an.'),
+    !S.tpl&&S.loaded?h('div',{class:'banner warn'},'Die Vorlage „KI-Telefon-Agent“ fehlt noch. Ohne sie gibt es keine Fragen.'):null);
+}
+function header(c,title){
+  return h('div',{class:'row',style:'align-items:flex-end'},
+    h('div',null,h('div',{class:'eyebrow'},c.firma||'Ohne Namen'),h('h1',null,title)),
+    h('div',{class:'spacer'}));
+}
+function lockedBanner(c){return signed(c)?h('div',{class:'banner ok'},'Unterschrieben am '+fmtDate(c.signature.signedAt)+'. Änderungen sind gesperrt. Zum Ändern unter „Unterschrift“ eine neue Version starten.'):null;}
+
+function viewStart(c){
+  const stages=h('ol',{class:'stages','aria-label':'Ablauf'});
+  STAGES.forEach((st,i)=>{
+    const state=stageState(c,st.id);
+    let d='';
+    if(st.id==='fragen')d=answeredCount(c)+' von '+allQs().length+' Fragen beantwortet';
+    if(st.id==='datenschutz')d=legalOk(c)?'Angaben vollständig':'Speicherdauer, Hosting, Ansprechpartner';
+    if(st.id==='unterschrift')d=signed(c)?'Am '+fmtDate(c.signature.signedAt):'Direkt auf dem iPad, mit Zeitstempel';
+    if(st.id==='pdf')d=c.pdfAt?'Erstellt am '+fmtDate(c.pdfAt):'Zusammenfassung als PDF speichern';
+    if(st.id==='angebot')d='Folgt in Stufe 3 über Lexware Office';
+    const k=String(i+1).padStart(2,'0')+' · '+(state==='done'?'ERLEDIGT':state==='now'?'IN ARBEIT':state==='locked'?'BALD':'OFFEN');
+    stages.append(h('li',null,h('button',{type:'button',class:'stage '+state,disabled:state==='locked',onclick:()=>{S.view=st.id;render();}},h('span',{class:'k'},k),h('span',{class:'t'},st.t),h('span',{class:'d'},d))));
+  });
+  const ro=signed(c);
+  const f=(id,label,key,type)=>h('div',{class:'field'},h('label',{for:id},label),h('input',{type:type||'text',id,value:c[key]||'',disabled:ro,oninput:e=>{const p={};p[key]=e.target.value;saveCust(c.id,p);}}));
+  const stamm=h('section',{class:'card','aria-label':'Stammdaten'},h('h2',null,'Stammdaten'),
+    h('div',{class:'grid2'},f('s-firma','Firma','firma'),f('s-ap','Ansprechpartner / vertretungsberechtigt','ansprechpartner'),f('s-mail','E-Mail','email','email'),f('s-tel','Telefon','telefon','tel')),
+    f('s-adr','Adresse','adresse'));
+  const del=S.confirm==='del'+c.id
+    ?h('div',{class:'confirm'},'Kundenakte „'+(c.firma||'')+'“ endgültig löschen?',h('button',{type:'button',class:'btn danger',onclick:async()=>{await S.db.doc('customers/'+c.id).delete();S.curId=null;S.confirm=null;S.view='start';toast('Kundenakte gelöscht');render();}},'Ja, löschen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
+    :h('button',{type:'button',class:'btn danger',onclick:()=>{S.confirm='del'+c.id;render();}},'Kundenakte löschen');
+  const next=STAGES.find(st=>stageState(c,st.id)!=='done'&&stageState(c,st.id)!=='locked');
+  return [
+    h('div',{class:'row',style:'align-items:flex-end'},h('div',null,h('div',{class:'eyebrow'},'KI-Telefon-Agent'),h('h1',null,c.firma||'Ohne Namen')),h('div',{class:'spacer'}),
+      next?h('button',{type:'button',class:'btn primary',onclick:()=>{S.view=next.id;render();}},'Weiter: '+next.t):null),
+    stages,stamm,h('div',{class:'row'},del)];
+}
+
+function viewFragen(c){
+  if(!S.tpl)return [header(c,'Fragenkatalog'),viewEmpty()];
+  const secs=S.tpl.sections, si=Math.min(S.section,secs.length-1), sec=secs[si], a=c.answers||{}, ro=signed(c);
+  const total=allQs().length,n=answeredCount(c);
+  const chips=h('div',{class:'chips',role:'tablist'});
+  secs.forEach((s,i)=>chips.append(h('button',{type:'button',role:'tab','aria-selected':i===si?'true':'false',class:'chip'+(i===si?' on':''),onclick:()=>{S.section=i;render();}},s.title)));
+  const qs=sec.questions.map((q,qi)=>{
+    const num=allQs().indexOf(q)+1;
+    return h('div',{class:'q'+(q.star?' star':'')},
+      h('label',{for:'q-'+q.id},num+' · '+q.text+' ',q.star?h('span',{class:'star-mark','aria-label':'im Termin klären'},'★'):null),
+      h('textarea',{id:'q-'+q.id,disabled:ro,value:a[q.id]||'',oninput:e=>{const p={answers:{}};p.answers[q.id]=e.target.value;saveCust(c.id,p);}}));
+  });
+  return [
+    h('div',{class:'row',style:'align-items:flex-end'},h('div',null,h('div',{class:'eyebrow'},c.firma),h('h1',null,'KI-Telefon-Agent · Fragenkatalog')),h('div',{class:'spacer'}),
+      h('div',{class:'row'},h('span',{class:'eyebrow tabnum'},n+' von '+total+' beantwortet'),h('div',{class:'progress','aria-hidden':'true'},h('div',{style:'width:'+(total?Math.round(n/total*100):0)+'%'})))),
+    lockedBanner(c),chips,...qs,
+    h('div',{class:'row'},h('span',{class:'eyebrow'},'★ = im Termin klären · Antworten werden automatisch gespeichert'),h('div',{class:'spacer'}),
+      si>0?h('button',{type:'button',class:'btn',onclick:()=>{S.section=si-1;render();window.scrollTo(0,0);}},'Zurück'):null,
+      si<secs.length-1?h('button',{type:'button',class:'btn primary',onclick:()=>{S.section=si+1;render();window.scrollTo(0,0);}},'Weiter: '+secs[si+1].title)
+        :h('button',{type:'button',class:'btn primary',onclick:()=>{S.view='datenschutz';render();window.scrollTo(0,0);}},'Weiter: Datenschutz'))];
+}
+
+function legalDocs(){return (S.legal&&S.legal.items)||[];}
+function viewDatenschutz(c){
+  const l=c.legal||{}, ro=signed(c);
+  const set=(k,v)=>{const p={legal:{}};p.legal[k]=v;saveCust(c.id,p,300);if(S._drawPreview)S._drawPreview();};
+  const preview=h('div',{class:'paper','aria-label':'Vorschau Dokument'});
+  const drawPreview=()=>{
+    preview.replaceChildren(h('div',{class:'ph'},h('img',{src:'logo-black.png',alt:'ONLION'}),h('span',null,(S.legal&&S.legal.draft!==false)?'Entwurf – vor Einsatz prüfen lassen':'')),h('div',{class:'bar'}));
+    if(!legalDocs().length)preview.append(h('p',null,'Noch keine Rechtstexte hinterlegt.'));
+    for(const d of legalDocs())preview.append(h('h3',{style:'font-family:var(--sans);font-size:17px;margin:18px 0 8px'},d.title),h('pre',null,fill(d.body,cur()||c)));
+  };
+  drawPreview(); S._drawPreview=drawPreview;
+  const sel=h('select',{id:'l-sp',disabled:ro,onchange:e=>{set('speicherung',e.target.value);}},h('option',{value:''},'Bitte wählen'),...STORAGE_OPTS.map(o=>{const op=h('option',{value:o},o);if(l.speicherung===o)op.selected=true;return op;}));
+  const chk=(id,key,text)=>h('label',{class:'check',for:id},h('input',{type:'checkbox',id,checked:l[key],disabled:ro,onchange:e=>set(key,e.target.checked)}),h('span',null,text));
+  const form=h('section',{class:'card','aria-label':'Angaben'},
+    h('h2',null,'Auftragsverarbeitung'),
+    h('div',{class:'field'},h('label',{for:'l-dsb'},'Datenschutzbeauftragter (Name, E-Mail)'),h('input',{type:'text',id:'l-dsb',value:l.dsb||'',disabled:ro,oninput:e=>set('dsb',e.target.value)})),
+    h('div',{class:'field'},h('label',{for:'l-sp'},'Gespräche speichern'),sel),
+    chk('l-eu','eu','Verarbeitung ausschließlich in der EU'),
+    chk('l-hinweis','hinweis','Anrufer werden zu Beginn informiert, dass sie mit einer KI sprechen und wie Daten gespeichert werden'),
+    chk('l-agb','agb','Kunde hat AGB und Datenschutzhinweise von ONLION erhalten'),
+    chk('l-ref','referenz','Optional: ONLION darf den Kunden als Referenz nennen'),
+    h('div',{class:'field'},h('label',{for:'l-notiz'},'Besondere Vereinbarungen'),h('textarea',{id:'l-notiz',value:l.notiz||'',disabled:ro,oninput:e=>set('notiz',e.target.value)})),
+    legalOk(c)?h('div',{class:'banner ok'},'Alle Pflichtangaben sind erfasst.'):h('div',{class:'banner info'},'Pflicht: Datenschutzbeauftragter, Speicherung, Hinweis an Anrufer, AGB erhalten.'),
+    h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>{S.view='fragen';render();}},'Zurück'),h('div',{class:'spacer'}),h('button',{type:'button',class:'btn primary',onclick:()=>{S.view='unterschrift';render();window.scrollTo(0,0);}},'Zur Unterschrift')));
+  return [h('div',null,h('div',{class:'eyebrow'},c.firma),h('h1',null,'KI-Telefon-Agent · Datenschutz & AVV')),lockedBanner(c),h('div',{class:'split'},form,preview)];
+}
+
+/* signature pads */
+function makePad(key){
+  const cv=h('canvas',{class:'pad','aria-label':'Unterschriftsfeld',role:'img'});
+  const st={empty:true};S.pads[key]={cv,st};
+  let ctx,drawing=false,last=null;
+  const size=()=>{const r=cv.getBoundingClientRect(),d=window.devicePixelRatio||1;if(!r.width)return;cv.width=r.width*d;cv.height=r.height*d;ctx=cv.getContext('2d');ctx.scale(d,d);ctx.lineWidth=2.4;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#111';st.empty=true;};
+  requestAnimationFrame(size);
+  const pos=e=>{const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
+  cv.addEventListener('pointerdown',e=>{if(!ctx)size();drawing=true;last=pos(e);cv.setPointerCapture(e.pointerId);ctx.beginPath();ctx.arc(last.x,last.y,1.2,0,Math.PI*2);ctx.fillStyle='#111';ctx.fill();if(st.empty){st.empty=false;checkSign();}});
+  cv.addEventListener('pointermove',e=>{if(!drawing)return;const p=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;if(st.empty){st.empty=false;checkSign();}});
+  const end=()=>{drawing=false;};cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+  const clear=h('button',{type:'button',class:'btn',onclick:()=>{size();checkSign();}},'Löschen');
+  return h('div',{class:'pad-wrap'},cv,h('div',{class:'row'},clear));
+}
+function checkSign(){
+  const b=document.getElementById('signBtn');if(!b)return;
+  const ok=S.pads.kunde&&!S.pads.kunde.st.empty&&S.pads.onlion&&!S.pads.onlion.st.empty&&(document.getElementById('sg-name')||{}).value&&(document.getElementById('sg-ort')||{}).value;
+  b.disabled=!ok;
+}
+function canonical(c,extra){
+  const legalTexts=legalDocs().map(d=>({title:d.title,body:fill(d.body,c)}));
+  const qa=allQs().map(q=>({q:q.text,a:(c.answers||{})[q.id]||''}));
+  return JSON.stringify({firma:c.firma||'',adresse:c.adresse||'',ansprechpartner:c.ansprechpartner||'',email:c.email||'',telefon:c.telefon||'',qa,legal:c.legal||{},legalTexts,extra});
+}
+async function sha256(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function viewUnterschrift(c){
+  S.pads={};
+  if(signed(c)){
+    const sg=c.signature;
+    const reset=S.confirm==='unsign'+c.id
+      ?h('div',{class:'confirm'},'Unterschrift zurückziehen und neue Version starten? Das bisherige PDF bleibt gültig, die Akte wird wieder bearbeitbar.',h('button',{type:'button',class:'btn danger',onclick:async()=>{const hist=(c.history||[]).concat([sg]);await S.db.doc('customers/'+c.id).update({signature:null,history:hist,pdfAt:null});S.confirm=null;toast('Neue Version gestartet');render();}},'Ja, neue Version'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
+      :h('button',{type:'button',class:'btn danger',onclick:()=>{S.confirm='unsign'+c.id;render();}},'Neue Version starten');
+    return [h('div',null,h('div',{class:'eyebrow'},c.firma),h('h1',null,'Unterschrift')),
+      h('div',{class:'banner ok'},'Unterschrieben am '+fmtDate(sg.signedAt)+' in '+sg.ort+'.'),
+      h('div',{class:'grid2'},
+        h('div',{class:'card'},h('div',{class:'label'},'Kunde'),h('img',{class:'sigimg',src:sg.kunde.img,alt:'Unterschrift '+sg.kunde.name}),h('div',null,sg.kunde.name)),
+        h('div',{class:'card'},h('div',{class:'label'},'ONLION'),h('img',{class:'sigimg',src:sg.onlion.img,alt:'Unterschrift '+sg.onlion.name}),h('div',null,sg.onlion.name))),
+      h('div',{class:'card'},h('div',{class:'label'},'Prüfsumme (SHA-256) des unterschriebenen Inhalts'),h('div',{class:'mono'},sg.hash)),
+      h('div',{class:'row'},reset,h('div',{class:'spacer'}),h('button',{type:'button',class:'btn primary',onclick:()=>{S.view='pdf';render();}},'Weiter: PDF'))];
+  }
+  const missing=[];
+  if(answeredCount(c)<allQs().length)missing.push((allQs().length-answeredCount(c))+' Fragen offen');
+  if(!legalOk(c))missing.push('Datenschutz-Pflichtangaben fehlen');
+  const signBtn=h('button',{type:'button',class:'btn primary',id:'signBtn',disabled:true,onclick:async e=>{
+    e.target.disabled=true;
+    const name=document.getElementById('sg-name').value.trim(),ort=document.getElementById('sg-ort').value.trim();
+    const kc=S.pads.kunde.cv,oc=S.pads.onlion.cv;
+    const kunde={name,img:kc.toDataURL('image/png'),ratio:kc.height/kc.width},onlion={name:'Adam Cebulla, ONLION',img:oc.toDataURL('image/png'),ratio:oc.height/oc.width};
+    await flushAll();
+    const fresh=cur()||c;
+    const signedAt=new Date().toISOString();
+    const hash=await sha256(canonical(fresh,{signedAt,ort,kunde:name}));
+    try{await S.db.doc('customers/'+c.id).update({signature:{kunde,onlion,ort,signedAt,hash,version:(c.history||[]).length+1}});toast('Unterschrieben');}
+    catch(err){toast('Nicht gespeichert: '+(err&&err.message||err));e.target.disabled=false;}
+  }},'Verbindlich unterschreiben');
+  return [h('div',null,h('div',{class:'eyebrow'},c.firma),h('h1',null,'Unterschrift')),
+    missing.length?h('div',{class:'banner warn'},'Noch offen: '+missing.join(' · ')+'. Unterschreiben geht trotzdem, das PDF zeigt die offenen Punkte.'):h('div',{class:'banner ok'},'Fragenkatalog und Datenschutz sind vollständig.'),
+    h('p',{style:'margin:0;max-width:70ch;color:var(--muted)'},'Mit der Unterschrift bestätigen beide Seiten die Angaben im Fragenkatalog und die Vereinbarung zur Auftragsverarbeitung in der Fassung der Vorschau. Gespeichert werden Name, Ort, Zeitpunkt und eine Prüfsumme des Inhalts.'),
+    h('div',{class:'grid2'},
+      h('div',{class:'field'},h('label',{for:'sg-name'},'Name des Unterzeichners (Kunde)'),h('input',{type:'text',id:'sg-name',value:c.ansprechpartner||'',oninput:checkSign})),
+      h('div',{class:'field'},h('label',{for:'sg-ort'},'Ort'),h('input',{type:'text',id:'sg-ort',value:'',oninput:checkSign}))),
+    h('div',{class:'grid2'},
+      h('div',{class:'card'},h('div',{class:'label'},'Unterschrift Kunde'),makePad('kunde')),
+      h('div',{class:'card'},h('div',{class:'label'},'Unterschrift ONLION · Adam Cebulla'),makePad('onlion'))),
+    h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>{S.view='datenschutz';render();}},'Zurück'),h('div',{class:'spacer'}),signBtn)];
+}
+
+/* PDF */
+function clean(s){return String(s==null?'':s).replace(/[„“”]/g,'"').replace(/[‚‘’]/g,"'").replace(/[–—]/g,'-').replace(/…/g,'...').replace(/€/g,'EUR').replace(/★/g,'*').replace(/[^\x00-\xFF\n]/g,'');}
+async function imgData(url){const r=await fetch(url);const b=await r.blob();return await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(b);});}
+async function buildPdf(c){
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210,M=18,CW=W-2*M; let y=0;
+  let logo=null;try{logo=await imgData('logo-black.png');}catch(e){}
+  const head=()=>{if(logo)doc.addImage(logo,'PNG',M,12,34,7,'logo','FAST');doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(110);doc.text(clean('KI-Telefon-Agent · Kundenaufnahme'),W-M,16,{align:'right'});doc.setDrawColor(200,255,0);doc.setLineWidth(1);doc.line(M,23,M+16,23);y=32;doc.setTextColor(28);};
+  const need=hgt=>{if(y+hgt>280){doc.addPage();head();}};
+  const para=(t,size,style,gap)=>{size=size||10;doc.setFont('helvetica',style||'normal');doc.setFontSize(size);const lines=doc.splitTextToSize(clean(t),CW);for(const ln of lines){need(size*0.45);doc.setFont('helvetica',style||'normal');doc.setFontSize(size);doc.setTextColor(28);doc.text(ln,M,y);y+=size*0.45;}y+=gap==null?2:gap;};
+  head();
+  para(c.firma||'Ohne Namen',18,'bold',1);
+  para([c.adresse,c.ansprechpartner,c.email,c.telefon].filter(Boolean).join(' · '),10,'normal',4);
+  para('Fragenkatalog',13,'bold',2);
+  for(const s of (S.tpl?S.tpl.sections:[])){
+    para(s.title,11,'bold',1);
+    for(const q of s.questions){const a=(c.answers||{})[q.id]||'';para((allQs().indexOf(q)+1)+'. '+q.text+(q.star?' *':''),9.5,'bold',0.5);para(a||'- offen -',9.5,'normal',2.5);}
+  }
+  const l=c.legal||{};
+  para('Datenschutz-Angaben',13,'bold',2);
+  para('Datenschutzbeauftragter: '+(l.dsb||'- offen -'),9.5);
+  para('Speicherung der Gespräche: '+(l.speicherung||'- offen -'),9.5);
+  para('Verarbeitung nur in der EU: '+(l.eu?'ja':'nein'),9.5);
+  para('Hinweis an Anrufer (KI und Speicherung): '+(l.hinweis?'ja':'nein'),9.5);
+  para('AGB und Datenschutzhinweise erhalten: '+(l.agb?'ja':'nein'),9.5);
+  para('Nennung als Referenz: '+(l.referenz?'ja':'nein'),9.5);
+  if(l.notiz)para('Besondere Vereinbarungen: '+l.notiz,9.5);
+  y+=2;
+  for(const d of legalDocs()){para(d.title,12,'bold',1.5);para(fill(d.body,c),9.5,'normal',3);}
+  const sg=c.signature;
+  need(70);para('Unterschriften',13,'bold',3);
+  if(sg){
+    const sy=y;
+    const ih=r=>Math.min(26,75*(r||0.25));
+    try{doc.addImage(sg.kunde.img,'PNG',M,sy+26-ih(sg.kunde.ratio),75,ih(sg.kunde.ratio),'sigk','FAST');doc.addImage(sg.onlion.img,'PNG',M+CW/2+4,sy+26-ih(sg.onlion.ratio),75,ih(sg.onlion.ratio),'sigo','FAST');}catch(e){}
+    y=sy+28;doc.setDrawColor(40);doc.setLineWidth(0.3);doc.line(M,y,M+75,y);doc.line(M+CW/2+4,y,M+CW/2+79,y);y+=4.5;
+    doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text(clean(sg.kunde.name),M,y);doc.text(clean(sg.onlion.name),M+CW/2+4,y);y+=6;
+    para(sg.ort+', '+fmtDate(sg.signedAt),9.5,'normal',2);
+    para('Prüfsumme SHA-256: '+sg.hash,7.5,'normal',1);
+  } else para('Noch nicht unterschrieben.',10);
+  const pages=doc.getNumberOfPages();
+  for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFontSize(7.5);doc.setTextColor(120);doc.text(clean('ONLION · Adam Cebulla · Rechtstexte: Entwurf, vor Einsatz prüfen lassen'),M,290);doc.text('Seite '+i+' von '+pages,W-M,290,{align:'right'});}
+  return doc.output('blob');
+}
+function viewPdf(c){
+  const status=h('div',{class:'eyebrow'});
+  const btn=h('button',{type:'button',class:'btn primary',onclick:async()=>{
+    if(!window.jspdf){toast('PDF-Baustein lädt nicht. Seite neu laden.');return;}
+    btn.disabled=true;status.textContent='PDF wird erstellt …';
+    try{
+      const blob=await buildPdf(c);
+      const name=('ONLION_KI-Telefon-Agent_'+(c.firma||'Kunde')).replace(/[^\wäöüÄÖÜß.-]+/g,'_')+'.pdf';
+      if(!S.dl){status.textContent='Speichern ist in dieser Ansicht nicht möglich.';btn.disabled=false;return;}
+      await S.dl.save({filename:name,data:blob});
+      await S.db.doc('customers/'+c.id).update({pdfAt:new Date().toISOString()});
+      status.textContent='Gespeichert: '+name;toast('PDF gespeichert');
+    }catch(e){status.textContent=e&&e.code==='declined'?'Speichern abgebrochen.':'Fehler: '+(e&&e.message||e);}
+    btn.disabled=false;
+  }},'PDF erstellen und speichern');
+  return [h('div',null,h('div',{class:'eyebrow'},c.firma),h('h1',null,'PDF-Zusammenfassung')),
+    signed(c)?h('div',{class:'banner ok'},'Unterschrieben. Das PDF enthält Fragenkatalog, Datenschutz-Angaben, AVV, beide Unterschriften und die Prüfsumme.'):h('div',{class:'banner warn'},'Noch nicht unterschrieben. Das PDF ist dann nur ein Entwurf.'),
+    h('div',{class:'card'},h('div',{class:'row'},btn,status),
+      c.pdfAt?h('div',{class:'eyebrow'},'Zuletzt erstellt: '+fmtDate(c.pdfAt)):null,
+      h('div',{class:'banner info'},'Versand per E-Mail an den Kunden über Brevo folgt in Stufe 2. Bis dahin das PDF speichern und aus Outlook verschicken.'))];
+}
+function viewAngebot(c){return [h('div',null,h('div',{class:'eyebrow'},c.firma),h('h1',null,'Angebot & Rechnung')),h('div',{class:'banner info'},'Folgt in Stufe 3 über Lexware Office, damit Nummern, Archiv und E-Rechnung rechtssicher sind.')];}
+
+/* templates */
+let tplTimer;
+function saveTpl(){clearTimeout(tplTimer);tplTimer=setTimeout(()=>{S.db.doc('templates/'+TPL_ID).set(S.tpl).catch(e=>toast('Nicht gespeichert: '+e.message));},500);}
+function viewVorlagen(){
+  const out=[h('div',null,h('div',{class:'eyebrow'},'Einstellungen'),h('h1',null,'Vorlagen & Rechtstexte'))];
+  if(!S.tpl){out.push(viewEmpty());return out;}
+  out.push(h('div',{class:'banner info'},'Änderungen gelten für alle Kunden. Bereits unterschriebene Akten behalten ihre Prüfsumme; ihr PDF zeigt aber die aktuelle Fassung der Fragen.'));
+  S.tpl.sections.forEach((s,si)=>{
+    const card=h('section',{class:'card'},h('div',{class:'field'},h('label',{for:'ts-'+si},'Abschnitt'),h('input',{type:'text',id:'ts-'+si,value:s.title,oninput:e=>{s.title=e.target.value;saveTpl();}})));
+    s.questions.forEach((q,qi)=>{
+      card.append(h('div',{class:'tpl-q'},
+        h('input',{type:'text','aria-label':'Frage',id:'tq-'+q.id,value:q.text,oninput:e=>{q.text=e.target.value;saveTpl();}}),
+        h('label',{class:'check',style:'min-height:44px;align-items:center'},h('input',{type:'checkbox',checked:q.star,onchange:e=>{q.star=e.target.checked;saveTpl();}}),'★'),
+        h('button',{type:'button',class:'btn','aria-label':'Frage entfernen',onclick:()=>{s.questions.splice(qi,1);saveTpl();render();}},'Entfernen')));
+    });
+    card.append(h('button',{type:'button',class:'btn ghost-dashed',onclick:()=>{s.questions.push({id:'q'+Date.now().toString(36),text:'Neue Frage',star:false});saveTpl();render();}},'+ Frage hinzufügen'));
+    out.push(card);
+  });
+  out.push(h('h2',null,'Rechtstexte'),h('div',{class:'banner warn'},'Entwurf: Diese Texte vor dem ersten echten Einsatz von einem Anwalt prüfen lassen. Platzhalter: {{firma}}, {{adresse}}, {{vertreter}}, {{dsb}}, {{speicherung}}, {{datum}}.'));
+  legalDocs().forEach((d,i)=>{
+    out.push(h('section',{class:'card'},
+      h('div',{class:'field'},h('label',{for:'lt-'+i},'Titel'),h('input',{type:'text',id:'lt-'+i,value:d.title,oninput:e=>{d.title=e.target.value;}})),
+      h('div',{class:'field'},h('label',{for:'lb-'+i},'Text'),h('textarea',{id:'lb-'+i,style:'min-height:260px',value:d.body,oninput:e=>{d.body=e.target.value;}})),
+      h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async()=>{await S.db.doc('legal/'+LEGAL_ID).set(S.legal);toast('Rechtstext gespeichert');}},'Speichern'))));
+  });
+  return out;
+}
+
+/* ---------- render ---------- */
+function render(){
+  const a=document.activeElement;
+  if(a&&a.closest&&a.closest('#view')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.type!=='checkbox'&&!render._force){S.pendingRender=true;renderSide();return;}
+  render._force=false;
+  renderSide();
+  const v=document.getElementById('view');const c=cur();let kids;
+  if(S.view==='vorlagen')kids=viewVorlagen();
+  else if(!c)kids=[viewEmpty()];
+  else kids=({start:viewStart,fragen:viewFragen,datenschutz:viewDatenschutz,unterschrift:viewUnterschrift,pdf:viewPdf,angebot:viewAngebot}[S.view]||viewStart)(c);
+  v.replaceChildren(...[].concat(kids).filter(Boolean));
+}
+document.addEventListener('focusout',()=>{setTimeout(()=>{const a=document.activeElement;const typing=a&&a.closest&&a.closest('#view')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);if(S.pendingRender&&!typing&&S.view!=='unterschrift'){S.pendingRender=false;render();}},50);});
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button');if(b)render._force=true;setTimeout(()=>render._force=false,0);},true);
+document.getElementById('navTpl').addEventListener('click',()=>{S.view='vorlagen';render();});
+
+render();
+/* ---------- Supabase-Anbindung ---------- */
+function makeDb(sb){
+  const listeners=new Set(),queues=new Map();
+  const enqueue=(key,fn)=>{const p=(queues.get(key)||Promise.resolve()).then(fn,fn);queues.set(key,p.catch(()=>{}));return p;};
+  const snap=(id,d)=>({id,exists:!!d,data:()=>d||undefined});
+  async function fetchDoc(col,id){const {data,error}=await sb.from('docs').select('data').eq('collection',col).eq('id',id).maybeSingle();if(error)throw error;return data?data.data:null;}
+  async function fetchCol(col){const {data,error}=await sb.from('docs').select('id,data').eq('collection',col);if(error)throw error;return data||[];}
+  async function emit(l){
+    try{
+      if(l.type==='doc'){l.cb(snap(l.id,await fetchDoc(l.col,l.id)));return;}
+      const rows=await fetchCol(l.col);
+      if(l.order){const [f,dir]=l.order;rows.sort((a,b)=>{const x=a.data[f]||'',y=b.data[f]||'';return (x<y?-1:x>y?1:0)*(dir==='desc'?-1:1);});}
+      l.cb({docs:rows.map(r=>snap(r.id,r.data))});
+    }catch(e){l.err&&l.err(e);}
+  }
+  const notify=col=>{for(const l of listeners)if(l.col===col)emit(l);};
+  sb.channel('docs-changes').on('postgres_changes',{event:'*',schema:'public',table:'docs'},p=>{const col=(p.new&&p.new.collection)||(p.old&&p.old.collection);if(col)notify(col);else for(const l of listeners)emit(l);}).subscribe();
+  async function write(col,id,data){const {error}=await sb.from('docs').upsert({collection:col,id,data,updated_at:new Date().toISOString()});if(error)throw error;}
+  function doc(path){
+    const [col,id]=path.split('/');const key=col+'/'+id;
+    return {id,
+      get:async()=>snap(id,await fetchDoc(col,id)),
+      set:d=>enqueue(key,async()=>{await write(col,id,d);notify(col);}),
+      update:p=>enqueue(key,async()=>{const cur=await fetchDoc(col,id);if(!cur)throw new Error('Datensatz nicht gefunden');await write(col,id,deepMerge(JSON.parse(JSON.stringify(cur)),JSON.parse(JSON.stringify(p))));notify(col);}),
+      delete:()=>enqueue(key,async()=>{const {error}=await sb.from('docs').delete().eq('collection',col).eq('id',id);if(error)throw error;notify(col);}),
+      onSnapshot(cb,err){const l={type:'doc',col,id,cb,err};listeners.add(l);emit(l);return()=>listeners.delete(l);}
+    };
+  }
+  function collection(col){
+    const q={_order:null,
+      orderBy(f,dir){q._order=[f,dir||'asc'];return q;},
+      doc(id){return doc(col+'/'+(id||crypto.randomUUID()));},
+      onSnapshot(cb,err){const l={type:'col',col,cb,err,order:q._order};listeners.add(l);emit(l);return()=>listeners.delete(l);}
+    };
+    return q;
+  }
+  return {doc,collection};
+}
+const browserDownloads={save:async({filename,data})=>{
+  const url=URL.createObjectURL(data);const a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+}};
+function loginFlow(sb){
+  return new Promise(resolve=>{
+    const box=document.getElementById('login'),form=document.getElementById('loginForm'),err=document.getElementById('lg-err'),btn=document.getElementById('lg-btn');
+    box.hidden=false;setTimeout(()=>document.getElementById('lg-mail').focus(),50);
+    form.addEventListener('submit',async e=>{
+      e.preventDefault();err.hidden=true;btn.disabled=true;btn.textContent='Anmelden …';
+      const {data,error}=await sb.auth.signInWithPassword({email:document.getElementById('lg-mail').value.trim(),password:document.getElementById('lg-pw').value});
+      btn.disabled=false;btn.textContent='Anmelden';
+      if(error){err.textContent='Anmeldung fehlgeschlagen. E-Mail und Passwort prüfen.';err.hidden=false;return;}
+      box.hidden=true;resolve(data.session);
+    });
+  });
+}
+function showSetup(){
+  document.getElementById('view').replaceChildren(h('div',{class:'empty'},h('h1',null,'Einrichtung fehlt'),h('p',{style:'margin:0;max-width:60ch'},'In der Datei config.js fehlen die Supabase-Adresse und der öffentliche Schlüssel. Schritte stehen in der README.')));
+}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
+
+(async function boot(){
+  const cfg=window.ONLION_CONFIG||{};
+  if(!window.supabase||!cfg.supabaseUrl||/DEIN-PROJEKT/.test(cfg.supabaseUrl)){S.loaded=true;render();showSetup();return;}
+  const sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
+  document.getElementById('logoutBtn').addEventListener('click',async()=>{await sb.auth.signOut();location.reload();});
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session)await loginFlow(sb);
+  const db=makeDb(sb);
+  S.db=db;S.dl=browserDownloads;
+  db.collection('customers').orderBy('createdAt','desc').onSnapshot(snap=>{
+    S.customers=snap.docs.map(d=>Object.assign({id:d.id},d.data()));S.loaded=true;
+    if(!S.curId&&S.customers.length)S.curId=S.customers[0].id;
+    if(S.view==='datenschutz'&&S._drawPreview){S._drawPreview();}
+    if(S.view==='unterschrift'&&!signed(cur())){renderSide();return;}
+    render();
+  },e=>{S.loaded=true;toast('Kunden konnten nicht geladen werden.');render();});
+  db.doc('templates/'+TPL_ID).onSnapshot(s=>{
+    const a=document.activeElement;if(S.view==='vorlagen'&&a&&a.closest&&a.closest('#view'))return;
+    S.tpl=s.exists?JSON.parse(JSON.stringify(s.data())):null;if(S.tpl&&S.tpl.name)document.getElementById('prodName').textContent=S.tpl.product||'KI-Telefon-Agent';
+    if(S.view==='unterschrift'&&!signed(cur())){renderSide();return;}render();});
+  db.doc('legal/'+LEGAL_ID).onSnapshot(s=>{
+    const a=document.activeElement;if(S.view==='vorlagen'&&a&&a.closest&&a.closest('#view'))return;
+    S.legal=s.exists?JSON.parse(JSON.stringify(s.data())):null;if(S.view==='datenschutz'&&S._drawPreview)S._drawPreview();else if(S.view==='unterschrift'&&!signed(cur()))renderSide();else render();});
+})();
+})();
+</script>
+</body>
+</html>
