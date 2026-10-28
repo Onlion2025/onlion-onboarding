@@ -45,6 +45,27 @@ Jede spätere Änderung, zum Beispiel an `config.js`, in GitHub speichern. Netli
 ### 5. Auf dem iPad installieren
 Die Adresse in **Safari** öffnen, dann **Teilen → Zum Home-Bildschirm**. Die App startet danach im Vollbild mit ONLION-Symbol.
 
+### 6. E-Mail-Versand (Brevo)
+1. In Brevo unter **Senders, Domains & Dedicated IPs** deine Absender-Domain verifizieren (SPF, DKIM, DMARC). Ohne diesen Schritt landen die Mails im Spam.
+2. Unter **SMTP & API → API Keys** einen neuen Schlüssel erzeugen.
+3. Den Schlüssel nur in Netlify eintragen (siehe Schritt 7), nie in `config.js`.
+
+### 7. Einstellungen in Netlify (Environment variables)
+In Netlify unter **Site configuration → Environment variables** diese Werte anlegen und danach neu veröffentlichen („Trigger deploy“):
+
+| Name | Inhalt |
+| --- | --- |
+| `SUPABASE_URL` | dieselbe Project URL wie in `config.js` |
+| `SUPABASE_ANON_KEY` | derselbe anon public Key wie in `config.js` |
+| `BREVO_API_KEY` | API-Schlüssel aus Brevo |
+| `BREVO_SENDER_EMAIL` | verifizierte Absenderadresse, z. B. info@deine-domain.de |
+| `BREVO_SENDER_NAME` | `ONLION` |
+| `ALLOWED_USER_EMAIL` | die E-Mail deines Supabase-Logins. Nur dieses Konto darf senden und Belege anlegen. |
+| `OWNER_EMAIL` | deine Adresse für eine Blindkopie jeder Mail |
+| `REPLY_TO_EMAIL` | optional: Adresse für Antworten |
+
+Jede Anfrage an Brevo prüft vorher, dass genau dein Konto angemeldet ist. Die Schlüssel verlassen den Server nie.
+
 ---
 
 ## Bedienung
@@ -52,7 +73,9 @@ Die Adresse in **Safari** öffnen, dann **Teilen → Zum Home-Bildschirm**. Die 
 - **Fragenkatalog:** Antworten werden automatisch gespeichert. Fragen mit ★ klärst du im Termin.
 - **Datenschutz & AVV:** links die Angaben, rechts die Live-Vorschau der Rechtstexte.
 - **Unterschrift:** Kunde und ONLION unterschreiben. Danach ist die Akte gesperrt. Ändern geht nur über **Neue Version starten**.
-- **PDF:** Zusammenfassung mit Logo, Antworten, AVV, Unterschriften und Prüfsumme.
+- **PDF:** Zusammenfassung mit Logo, Antworten, AVV, Unterschriften und Prüfsumme. Direkt per E-Mail an den Kunden senden, mit Kopie an dich, oder nur speichern.
+- **Angebot:** Positionen aus Bausteinen wählen (Potenzialanalyse, Pilot, Betrieb) oder frei anlegen, Preise anpassen, Summen mit 19 % USt sehen. Das verbindliche Angebot und die Rechnung erstellst du in deinem Buchhaltungsprogramm.
+- **Gesprächsfortschritt:** Prozentbalken über Stammdaten, Fragen und Datenschutz-Pflichtangaben. Offene ★-Fragen werden einzeln genannt.
 - **Vorlagen & Rechtstexte:** Fragen und Texte bearbeiten. Die Änderungen gelten für alle Kunden.
 
 ## Wichtig
@@ -60,7 +83,15 @@ Die Adresse in **Safari** öffnen, dann **Teilen → Zum Home-Bildschirm**. Die 
 - Schließe mit Supabase einen **Auftragsverarbeitungsvertrag (DPA)** ab. Das geht im Supabase-Dashboard.
 - Ein Backup ist im kostenlosen Supabase-Tarif nicht automatisch enthalten. Für den Dauerbetrieb lohnt sich der Pro-Tarif.
 
-## Geplant
-- **Stufe 2:** PDF per E-Mail über Brevo verschicken. Dafür kommt eine Netlify Function dazu, der Schlüssel liegt nur auf dem Server.
-- **Stufe 3:** Angebot und Rechnung über die Lexware-Office-Schnittstelle. Damit sind Nummernkreis, Archiv und E-Rechnung rechtssicher.
-- Weitere Vorlagen für andere ONLION-Produkte.
+- Mit **Brevo** ebenfalls einen Auftragsverarbeitungsvertrag abschließen.
+- Die Preise in den Bausteinen sind Startwerte. Pro Kunde lassen sie sich anpassen.
+
+## Aufbau
+- `index.html`: die App. Sie läuft im Browser und braucht keinen Build-Schritt.
+- `netlify/functions/send-pdf.js`: E-Mail-Versand über Brevo
+- `supabase/schema.sql`: Datenbank, Zugriffsschutz und Startdaten
+- `sw.js`, `manifest.webmanifest`, `icon-*.png`: Installation als App
+
+## Nächste Ausbaustufen
+- Weitere Vorlagen für andere ONLION-Produkte (z. B. KI-Backoffice, Roboter-Vertrieb)
+- Anbindung an ein Buchhaltungsprogramm für Angebote und Rechnungen, sobald eines eingerichtet ist
