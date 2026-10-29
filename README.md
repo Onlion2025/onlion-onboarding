@@ -77,7 +77,7 @@ In Netlify unter **Site configuration → Environment variables** diese Werte an
 Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist. Die Schlüssel verlassen den Server nie.
 
 ### Update: Firmenrecherche und Vorab-Broschüre (Oktober 2026)
-1. Auf platform.claude.com (Claude Console) ein Konto mit Zahlungsmethode anlegen, unter **API Keys** einen Schlüssel erzeugen und in Netlify als Secret `ANTHROPIC_API_KEY` eintragen (nur Production), danach **Trigger deploy**. Optional `ANTHROPIC_MODEL` (Standard: `claude-haiku-5-5`).
+1. Auf platform.claude.com (Claude Console) ein Konto mit Zahlungsmethode anlegen, unter **API Keys** einen Schlüssel erzeugen und in Netlify als Secret `ANTHROPIC_API_KEY` eintragen (nur Production), danach **Trigger deploy**. Optional `ANTHROPIC_MODEL` (Standard: `claude-haiku-5-5`) und `RESEARCH_TIMEOUT_MS` (Standard 9200). Die Auswertung läuft in drei parallelen Teilen, damit jede Anfrage unter dem Netlify-Zeitlimit von 10 s bleibt. Meldet die App „hat zu lange gedauert“, hilft ein erneuter Versuch; bei Dauerproblemen in Netlify das Zeitlimit für Functions erhöhen (je nach Tarif).
 2. In der Console den Bedingungen zur Auftragsverarbeitung (DPA) zustimmen; die gelesenen Webseitentexte werden zur Auswertung an Anthropic übermittelt.
 
 ### Update: Sprachnotizen, Leads, Aktionen (Oktober 2026)
@@ -118,7 +118,7 @@ Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist.
 - **Vertriebspartner** sehen nur ihre eigenen Kunden (die sie anlegen oder die ihnen zugeordnet sind), ihre Konditionen, ihr Provisionskonto, ihre Gutschriften und die Namen ihrer Struktur. Keine Zahlungen, keine fremden Kunden, keine Vorlagen-Bearbeitung. Das sichert die Datenbank ab (`supabase/vertrieb.sql`).
 - **Stammdaten** stehen oben in jeder Kundenakte (neu: Branche, Webseite) und sind immer änderbar. Nach der Unterschrift zeigen PDF und Vereinbarung weiter die unterschriebene Fassung; Abweichungen werden angezeigt.
 - **Firmenrecherche:** Webseite eintragen (auch schon beim Anlegen) und „Firma recherchieren“: Die App liest öffentliche Seiten (Start, Impressum, Leistungen, Kontakt) und fasst sie mit Claude zusammen – Stammdaten werden vorausgefüllt, Kurzprofil, Staffel-Vorschlag und Vorschläge für den Fragenkatalog (per Klick übernehmen, als „vorab recherchiert“ markiert). Partner nur für eigene Kunden, Monatsgrenze unter Vertrieb → Partner.
-- **Vorab-Broschüre (PDF):** „Ihr KI-Telefon-Agent für [Firma]“ aus der Recherche. Per E-Mail nur senden, wenn der Empfänger zugestimmt hat (§ 7 UWG) – die App fragt das ab und protokolliert den Versand.
+- **Vorab-Broschüre (PDF):** „Ihr KI-Telefon-Agent für [Firma]“ aus der Recherche. Per E-Mail nur senden, wenn der Empfänger zugestimmt hat (§ 7 UWG) – die App fragt das ab, der Server prüft es zusätzlich und protokolliert jeden Versand in der Sammlung `versand`. Die Texte der Broschüre lassen sich vor dem Versand prüfen und ändern. Recherchen zählen beim Lesen der Webseite; fehlgeschlagene Abrufe zählen nicht.
 - **Logo** führt zum Dashboard.
 - **Fragenkatalog:** Punkt, „x“ und ähnliche Platzhalter zählen nicht als Antwort. ★-Fragen sind Pflicht, andere Fragen brauchen eine echte Antwort oder „Entfällt“ – sonst ist keine Unterschrift möglich.
 - **Sprachnotizen** im Bereich Vertrieb der Kundenakte: aufnehmen (max. 3 Minuten), Abschrift landet automatisch im Gesprächsprotokoll, Anhören und Löschen. Nur für eigene Notizen; Gespräche nicht ohne Zustimmung mitschneiden (§ 201 StGB).

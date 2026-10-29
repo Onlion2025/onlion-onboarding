@@ -85,6 +85,17 @@ async function sendLinkMail(to, subject, intro, buttonText, link) {
   return { ok: r.ok, message: t.message || String(r.status) };
 }
 
+// Vertriebspartner dürfen nur eigene Kunden bearbeiten. Gibt null zurück, wenn der Zugriff erlaubt ist, sonst den Grund.
+async function customerAccess(user, cid) {
+  if (user.role !== 'partner') return null;
+  if (!/^[\w-]{1,80}$/.test(String(cid || ''))) return 'Bitte zuerst den Kunden anlegen.';
+  const r = await admin('/rest/v1/docs?select=data&collection=eq.customers&id=eq.' + encodeURIComponent(cid));
+  const rows = r.ok ? await r.json().catch(() => []) : [];
+  const owner = rows[0] && rows[0].data && lc(rows[0].data.partner);
+  if (!owner || owner !== lc(user.email)) return 'Kein Zugriff auf diesen Kunden.';
+  return null;
+}
+
 function parseBody(event) {
   try { return JSON.parse(event.body || '{}'); } catch (e) { return null; }
 }
@@ -95,4 +106,4 @@ function missingEnv(names) {
 
 const envHint = missing => 'In Netlify fehlen Einstellungen: ' + missing.join(', ') + ' (siehe README, Schritt 7).';
 
-module.exports = { json, requireUser, parseBody, missingEnv, envHint, admin, teamRow, makeLink, sendLinkMail, lc, ownerEmail, EMAIL_RE };
+module.exports = { json, requireUser, parseBody, missingEnv, envHint, admin, teamRow, makeLink, sendLinkMail, lc, ownerEmail, EMAIL_RE, customerAccess };

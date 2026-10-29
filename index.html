@@ -77,6 +77,7 @@ input[type=date],input[type=month],input[type=datetime-local]{-webkit-appearance
 input[type=date]::-webkit-date-and-time-value,input[type=month]::-webkit-date-and-time-value,input[type=datetime-local]::-webkit-date-and-time-value{text-align:left;margin:0}
 .field>*{min-width:0;max-width:100%}
 .check{display:flex;gap:10px;align-items:flex-start;min-height:44px;padding-block:6px}
+.bro-edit{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:10px}.bro-edit>summary{cursor:pointer;font-weight:600;min-height:32px;display:flex;align-items:center}.bro-edit[open]>summary{margin-bottom:8px}.bro-edit .field+.field{margin-top:10px}
 .check input{width:20px;height:20px;margin-top:1px;accent-color:var(--accent-ink);flex:none}
 .stages{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;list-style:none;margin:0;padding:0}
 .stages>li{display:flex;min-width:0}
@@ -798,7 +799,7 @@ function viewPdf(c){
     send.disabled=true;mailStatus.textContent='PDF wird erstellt und gesendet …';
     try{
       const blob=await buildPdf(cur()||c);
-      await callFn('send-pdf',{to,toName:c.ansprechpartner||'',subject:document.getElementById('m-subj').value,message:document.getElementById('m-msg').value,filename:pdfName(c),pdfBase64:await blobToBase64(blob)});
+      await callFn('send-pdf',{to,toName:c.ansprechpartner||'',subject:document.getElementById('m-subj').value,message:document.getElementById('m-msg').value,customerId:c.id,filename:pdfName(c),pdfBase64:await blobToBase64(blob)});
       const now=new Date().toISOString();
       await S.db.doc('customers/'+c.id).update({pdfAt:now,sentAt:now,sentTo:to});
       mailStatus.textContent='Gesendet an '+to+'.';toast('E-Mail gesendet');
@@ -900,20 +901,34 @@ async function runResearch(c){
     const f=await callFn('research',{step:'fetch',url,customerId:c.id});
     S.research[c.id]={busy:true,step:'KI wertet aus …'};render._force=true;render();
     const qs=allQs().map(q=>({id:q.id,text:q.text}));const st=cfg().staffeln.map(x=>({id:x.id,label:x.label}));
-    const a=await callFn('research',{step:'analyze',url:f.url,customerId:c.id,pages:f.pages,questions:qs,staffeln:st});
-    const r=Object.assign({},a.result,{at:new Date().toISOString(),url:f.url,by:(S.me&&S.me.email)||''});
+    const base={step:'analyze',url:f.url,customerId:c.id,pages:f.pages,exp:f.exp,sig:f.sig};
+    // drei kurze Auswertungen parallel, damit keine das Zeitlimit reißt
+    const parts=await Promise.allSettled([callFn('research',Object.assign({part:'a',staffeln:st},base)),callFn('research',Object.assign({part:'b',questions:qs},base)),callFn('research',Object.assign({part:'c'},base))]);
+    const okParts=parts.filter(p=>p.status==='fulfilled');
+    if(!okParts.length)throw parts[0].reason||new Error('Auswertung fehlgeschlagen.');
+    const r=Object.assign({antworten:{},broschuere:{}},...okParts.map(p=>p.value.result),{at:new Date().toISOString(),url:f.url,by:(S.me&&S.me.email)||''});
+    if(!r.quellen)r.quellen=(f.pages||[]).map(p=>p.url);
     await flushAll();
     let fresh=S.customers.find(x=>x.id===c.id);if(!fresh){const sn=await S.db.doc('customers/'+c.id).get();fresh=sn.exists?Object.assign({id:c.id},sn.data()):null;}
     if(!fresh)throw new Error('Kundenakte nicht gefunden.');
     const patch={recherche:r};
     // leere Stammdaten automatisch füllen; Platzhalter-Firma (Domain) ersetzen
     for(const k of ['firma','adresse','telefon','email','ansprechpartner','branche']){const cv=String(fresh[k]||'').trim();if(r[k]&&(!cv||(k==='firma'&&cv===webHost(url))))patch[k]=r[k];}
-    // Vorschläge ersetzen statt zusammenführen
-    const full=JSON.parse(JSON.stringify(fresh));Object.assign(full,patch,{updatedAt:new Date().toISOString()});delete full.id;
-    await S.db.doc('customers/'+c.id).set(full);
-    S.research[c.id]={busy:false};toast('Recherche fertig');
+    // alte Vorschläge zuerst entfernen (ersetzen statt zusammenführen), dann gezielt speichern – mit Versionsprüfung
+    await S.db.doc('customers/'+c.id).update({recherche:null});
+    await S.db.doc('customers/'+c.id).update(patch);
+    const failed=parts.length-okParts.length;
+    S.research[c.id]={busy:false,error:failed?'Teilweise fertig – '+failed+' Teil(e) nicht ausgewertet. Bei Bedarf erneut recherchieren.':''};toast('Recherche fertig');
   }catch(e){S.research[c.id]={busy:false,error:e.message};}
   render._force=true;render();
+}
+const BRO_LISTS=[['anliegen','Typische Anliegen'],['weiterleitungen','Weiterleitungen'],['nutzen','Nutzen']];
+function broEditor(c,open){
+  const br=(c.recherche||{}).broschuere||{};
+  const save=p=>{const lc=S.customers.find(x=>x.id===c.id)||c;const curB=((lc.recherche||{}).broschuere)||{};saveCust(c.id,{recherche:{broschuere:Object.assign({},curB,p)}},400);};
+  return h('details',{class:'bro-edit',open:!!open},h('summary',null,'Texte der Broschüre prüfen und anpassen'),
+    h('div',{class:'field'},h('label',{for:'br-beg'},'Begrüßung am Telefon'),h('textarea',{id:'br-beg',style:'min-height:70px',value:br.begruessung||'',oninput:e=>save({begruessung:e.target.value.slice(0,400)})})),
+    ...BRO_LISTS.map(([k,l])=>h('div',{class:'field'},h('label',{for:'br-'+k},l+' (eine Zeile pro Punkt)'),h('textarea',{id:'br-'+k,style:'min-height:96px',value:(br[k]||[]).join('\n'),oninput:e=>{const p={};p[k]=e.target.value.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,8).map(x=>x.slice(0,250));save(p);}}))));
 }
 function researchCard(c){
   const r=c.recherche;if(!r)return null;
@@ -930,12 +945,12 @@ function researchCard(c){
     h('div',{class:'cols2'},row('Leistungen',r.leistungen),h('div',{style:'display:flex;flex-direction:column;gap:10px'},row('Zielkunden',r.zielkunden),row('Erreichbarkeit / Öffnungszeiten',r.oeffnungszeiten),row('Standorte',r.standorte),row('Größe',r.mitarbeiter))),
     row('Ansatzpunkte für den KI-Telefon-Agenten',r.ansatzpunkte),
     h('div',{class:'row',style:'gap:10px'},
-      stf?h('button',{type:'button',class:'btn',onclick:()=>{const items=((c.offer||{}).items||[]).filter(i=>i.kind!=='einrichtung'&&i.kind!=='lizenz');saveCust(c.id,{offer:{items:staffelItems(stf).concat(items),staffel:stf.id}},0);toast('Staffel „'+stf.label+'“ ins Angebot übernommen');render._force=true;render();}},'Staffel vorschlagen: '+stf.label):null,
+      stf?h('button',{type:'button',class:'btn',onclick:()=>{const curS=(c.offer||{}).staffel;if(curS&&curS!==stf.id){const old=cfg().staffeln.find(x=>x.id===curS);if(!confirm('Im Angebot ist bereits „'+(old?old.label:curS)+'“ gewählt. Durch „'+stf.label+'“ ersetzen?'))return;}const items=((c.offer||{}).items||[]).filter(i=>i.kind!=='einrichtung'&&i.kind!=='lizenz');saveCust(c.id,{offer:{items:staffelItems(stf).concat(items),staffel:stf.id}},0);toast('Staffel „'+stf.label+'“ ins Angebot übernommen');render._force=true;render();}},'Staffel vorschlagen: '+stf.label):null,
       nAnt?h('button',{type:'button',class:'btn',onclick:()=>{S.view='fragen';S.section=0;render();window.scrollTo(0,0);}},nAnt+(nAnt===1?' Vorschlag':' Vorschläge')+' im Fragenkatalog'):null,
       h('button',{type:'button',class:'btn primary',onclick:async()=>{try{const b=await brochurePdf(c);await S.dl.save({filename:brochureName(c),data:b});}catch(e){toast('PDF fehlgeschlagen: '+e.message);}}},'Vorab-Broschüre (PDF)'),
       h('button',{type:'button',class:'btn',onclick:()=>{S.broMail=mailOpen?null:c.id;render._force=true;render();}},'Broschüre per E-Mail')),
-    mailOpen?broMailForm(c):null,
-    r.quellen&&r.quellen.length?h('div',{class:'eyebrow',style:'overflow-wrap:anywhere'},'Quellen: '+r.quellen.join(' · ')):null);
+    mailOpen?broMailForm(c):broEditor(c,false),
+    r.quellen&&r.quellen.length?h('div',{class:'eyebrow'},'Quellen: '+[...new Set(r.quellen.map(u=>{try{const x=new URL(u);return webHost(u)+(x.pathname.length>1?x.pathname.replace(/\/$/,''):'');}catch(e){return '';}}).filter(Boolean))].join(' · ')):null);
 }
 function brochureName(c){return ('ONLION_KI-Telefon-Agent_fuer_'+(c.firma||'Kunde')).replace(/[^\wäöüÄÖÜß.-]+/g,'_')+'.pdf';}
 function broMailForm(c){
@@ -946,13 +961,14 @@ function broMailForm(c){
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)){st.textContent='Bitte eine gültige E-Mail-Adresse eintragen.';st.hidden=false;return;}
     if(!document.getElementById('bm-ok').checked){st.textContent='Bitte bestätigen, dass der Empfänger der Zusendung zugestimmt hat.';st.hidden=false;return;}
     const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;btn.textContent='Sende …';
-    try{const b=await brochurePdf(c);await callFn('send-pdf',{to,toName:ap,subject:document.getElementById('bm-subj').value,message:document.getElementById('bm-msg').value,filename:brochureName(c),pdfBase64:await blobToBase64(b)});
+    try{const b=await brochurePdf(c);await callFn('send-pdf',{to,toName:ap,subject:document.getElementById('bm-subj').value,message:document.getElementById('bm-msg').value,customerId:c.id,kind:'broschuere',consent:true,filename:brochureName(c),pdfBase64:await blobToBase64(b)});
       const entry={id:uid(),at:new Date().toISOString(),by:(S.me&&S.me.email)||'',type:'E-Mail',text:'Vorab-Broschüre an '+to+' gesendet (Zustimmung des Empfängers bestätigt).'};
       saveCust(c.id,{crm:{log:[entry].concat(crmOf(cur()||c).log||[])}},0);S.broMail=null;toast('Broschüre gesendet');render._force=true;render();}
     catch(err){st.textContent=err.message;st.hidden=false;btn.disabled=false;btn.textContent='Senden';}
   }},h('div',{class:'banner info'},'Werbung per E-Mail ist ohne Einwilligung auch an Firmen nicht erlaubt (§ 7 UWG). Nur senden, wenn der Empfänger zugestimmt hat – z. B. im Telefonat. Sonst die Broschüre mitbringen oder per Post senden.'),
     h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'bm-to'},'An'),h('input',{type:'email',id:'bm-to',value:c.email||''})),h('div',{class:'field'},h('label',{for:'bm-subj'},'Betreff'),h('input',{type:'text',id:'bm-subj',value:'Ihr KI-Telefon-Agent – Vorab-Information von ONLION'}))),
     h('div',{class:'field'},h('label',{for:'bm-msg'},'Nachricht'),h('textarea',{id:'bm-msg',style:'min-height:110px',value:(ap?'Guten Tag '+ap+',':'Guten Tag,')+'\n\nwie besprochen erhalten Sie anbei eine erste Vorab-Information, wie ein KI-Telefon-Agent für '+(c.firma||'Ihr Unternehmen')+' aussehen könnte.\n\nViele Grüße\nONLION'})),
+    broEditor(c,true),
     h('label',{class:'check'},h('input',{type:'checkbox',id:'bm-ok'}),'Der Empfänger hat der Zusendung zugestimmt.'),
     st,h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Senden'),h('button',{type:'button',class:'btn',onclick:()=>{S.broMail=null;render();}},'Abbrechen')));
 }
@@ -970,8 +986,10 @@ async function brochurePdf(c){
   doc.setFillColor(...SOFT);doc.rect(0,0,W,86,'F');
   if(logo)doc.addImage(logo,'PNG',M,18,40,8.3,'logo','FAST');
   font(10,'bold');col(ACC);doc.text('VORAB-INFORMATION',M,42);
-  font(24,'bold');col(INK);const tl=doc.splitTextToSize(clean('Ihr KI-Telefon-Agent für '+(c.firma||'Ihr Unternehmen')),CW);doc.text(tl,M,53);
-  font(11);col(MUT);doc.text(clean('Erreichbar rund um die Uhr – ohne zusätzliches Personal.'),M,53+tl.length*9.5);
+  let tsz=24,tl;for(;;){font(tsz,'bold');tl=doc.splitTextToSize(clean('Ihr KI-Telefon-Agent für '+(c.firma||'Ihr Unternehmen')),CW);if(tl.length<=2||tsz<=15)break;tsz-=2;}
+  if(tl.length>3){tl=tl.slice(0,3);tl[2]=tl[2].replace(/\s*\S*$/,'')+' …';}
+  col(INK);doc.text(tl,M,53);const lh=tsz*0.4;
+  font(11);col(MUT);doc.text(clean('Erreichbar rund um die Uhr – ohne zusätzliches Personal.'),M,53+(tl.length-1)*lh+8);
   doc.setFillColor(...LIME);doc.rect(0,86,W,2.2,'F');y=102;
   if(r.kurzprofil){h2('Was wir über '+(c.firma||'Sie')+' wissen');para(r.kurzprofil,10.5,'normal',INK,4);}
   if(br.begruessung){h2('So meldet sich Ihr Agent');const l=wrap('„'+br.begruessung+'“',11.5,'italic',CW-14);need(l.length*5.4+12);doc.setFillColor(...SOFT);doc.roundedRect(M,y-5,CW,l.length*5.4+8,2.5,2.5,'F');doc.setFillColor(...LIME);doc.rect(M,y-5,1.6,l.length*5.4+8,'F');font(11.5,'italic');col(INK);doc.text(l,M+7,y+0.5);y+=l.length*5.4+9;}
@@ -980,8 +998,8 @@ async function brochurePdf(c){
   if((br.nutzen||[]).length){h2('Ihr Nutzen');bullets(br.nutzen);}
   h2('So läuft die Einführung');
   bullets(['Gespräch: Ziele, Anliegen und Abläufe gemeinsam festlegen','Einrichtung: Begrüßung, Wissen und Weiterleitungen werden eingerichtet','Test: Sie rufen selbst an und geben Feedback','Start: Rufumleitung aktivieren – Ihr Agent ist erreichbar']);
-  const stf=(r.staffel&&cfg().staffeln.find(x=>x.id===r.staffel))||null;
-  if(stf&&!stf.individuell){h2('Investition');need(26);doc.setFillColor(...SOFT);doc.roundedRect(M,y-5,CW,22,2.5,2.5,'F');font(10);col(MUT);doc.text(clean('Paket '+stf.label),M+6,y+1.5);font(13,'bold');col(INK);doc.text(clean(eur(stf.einrichtung)+' Einrichtung  +  '+eur(stf.lizenz)+' pro Monat'),M+6,y+9.5);font(8.5);col(MUT);doc.text(clean('zzgl. USt. Unverbindliche Vorab-Information, das verbindliche Angebot folgt nach dem Gespräch.'),M+6,y+14.5);y+=26;}
+  const sid=(c.offer||{}).staffel||r.staffel;const stf=(sid&&cfg().staffeln.find(x=>x.id===sid))||null;
+  if(stf&&!stf.individuell){need(44);h2('Investition');doc.setFillColor(...SOFT);doc.roundedRect(M,y-5,CW,22,2.5,2.5,'F');font(10);col(MUT);doc.text(clean('Paket '+stf.label),M+6,y+1.5);font(13,'bold');col(INK);doc.text(clean(eur(stf.einrichtung)+' Einrichtung  +  '+eur(stf.lizenz)+' pro Monat'),M+6,y+9.5);font(8.5);col(MUT);doc.text(clean('zzgl. USt. Unverbindliche Vorab-Information, das verbindliche Angebot folgt nach dem Gespräch.'),M+6,y+14.5);y+=26;}
   const ab=cfg().absender||{};
   const pages=doc.getNumberOfPages();for(let i=1;i<=pages;i++){doc.setPage(i);font(7.5);col(MUT);doc.text(clean(['ONLION',ab.adresse].filter(Boolean).join(' · ')),M,288);doc.text('Seite '+i+' von '+pages,W-M,288,{align:'right'});}
   return doc.output('blob');

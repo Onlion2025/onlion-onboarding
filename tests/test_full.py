@@ -33,9 +33,12 @@ try:
             if 'research' in r.request.url:
                 d = json.loads(r.request.post_data or '{}')
                 if d.get('step') == 'fetch':
-                    return r.fulfill(status=200, content_type='application/json', body=json.dumps({'url': 'https://www.muster-immo.de/', 'meta': {}, 'pages': [{'url': 'https://www.muster-immo.de/', 'text': 'Muster Immobilien GmbH – Ihr Makler in Nürnberg'}]}))
+                    return r.fulfill(status=200, content_type='application/json', body=json.dumps({'url': 'https://www.muster-immo.de/', 'meta': {}, 'pages': [{'url': 'https://www.muster-immo.de/', 'text': 'Muster Immobilien GmbH – Ihr Makler in Nürnberg'}], 'exp': 9999999999999, 'sig': 'ab' * 32}))
                 res = {'firma': 'Muster Immobilien GmbH', 'adresse': 'Hauptstr. 1, 90402 Nürnberg', 'telefon': '0911 123456', 'email': 'info@muster-immo.de', 'ansprechpartner': 'Eva Muster', 'branche': 'Immobilienmakler', 'staffel': 's1', 'mitarbeiter': 'ca. 8', 'kurzprofil': 'Makler für Wohnimmobilien in Nürnberg.', 'leistungen': ['Verkauf', 'Vermietung'], 'zielkunden': 'Eigentümer', 'oeffnungszeiten': 'Mo–Fr 9–18 Uhr', 'standorte': ['Nürnberg'], 'ansatzpunkte': ['Anrufe nach Feierabend'], 'antworten': {'q04': 'ca. 60 Anrufe pro Woche (Vermutung)'}, 'broschuere': {'begruessung': 'Guten Tag, Muster Immobilien, hier spricht Lea.', 'anliegen': ['Exposé anfordern', 'Besichtigung'], 'weiterleitungen': ['Bei Verkaufsabsicht an Frau Muster'], 'nutzen': ['Keine verpassten Anrufe']}, 'quellen': ['https://www.muster-immo.de/impressum']}
-                return r.fulfill(status=200, content_type='application/json', body=json.dumps({'result': res}))
+                part = d.get('part')
+                if not d.get('sig'): return r.fulfill(status=400, content_type='application/json', body='{"error":"ohne Signatur"}')
+                keys = {'a': [k for k in res if k not in ('antworten', 'broschuere', 'quellen')] + ['quellen'], 'b': ['antworten'], 'c': ['broschuere']}[part]
+                return r.fulfill(status=200, content_type='application/json', body=json.dumps({'result': {k: res[k] for k in keys}}))
             r.fulfill(status=200, content_type='application/json', body='{"ok":true,"id":"lx-1"}')
         page.route('**/.netlify/functions/**', fn_route)
         page.goto('http://localhost:8765/index.html')
@@ -361,7 +364,12 @@ try:
         page.wait_for_selector('h2:has-text("Vorab recherchiert")', timeout=15000)
         rc = page.evaluate("()=>[...__rows.values()].map(r=>r.data).find(d=>d.webseite&&d.webseite.includes('muster-immo'))")
         ok('Recherche füllt Stammdaten (%s)' % rc.get('firma'), rc['firma'] == 'Muster Immobilien GmbH' and rc['ansprechpartner'] == 'Eva Muster' and rc['branche'] == 'Immobilienmakler' and rc['recherche']['kurzprofil'])
-        ok('Zwei Schritte: lesen und auswerten', sum(1 for u, a, d in fncalls if 'research' in u) == 2)
+        ok('Lesen, dann drei Auswertungen parallel', sum(1 for u, a, d in fncalls if 'research' in u) == 4 and sorted(json.loads(d).get('part') or '' for u, a, d in fncalls if 'research' in u) == ['', 'a', 'b', 'c'])
+        ok('Vorschläge aus allen Teilen gespeichert', rc['recherche']['antworten'].get('q04') and rc['recherche']['broschuere']['anliegen'] and rc['recherche']['quellen'])
+        ok('Quellen nur als Kurzadresse', 'muster-immo.de/impressum' in page.inner_text('#view') and 'https://' not in page.inner_text('section[aria-label="Vorab-Recherche"]'))
+        page.click('summary:has-text("Texte der Broschüre")'); page.fill('#br-beg', 'Guten Tag, Muster Immobilien, was kann ich für Sie tun?'); page.fill('#br-nutzen', 'Erreichbar am Abend\nWeniger Unterbrechungen'); page.wait_for_timeout(900)
+        rc = page.evaluate("()=>[...__rows.values()].map(r=>r.data).find(d=>d.webseite&&d.webseite.includes('muster-immo'))")
+        ok("Broschüren-Texte bearbeitbar", rc['recherche']['broschuere']['begruessung'].endswith('was kann ich für Sie tun?') and rc['recherche']['broschuere']['nutzen'] == ['Erreichbar am Abend', 'Weniger Unterbrechungen'] and rc['recherche']['broschuere']['anliegen'])
         page.click('button:has-text("Staffel vorschlagen")'); page.wait_for_timeout(400)
         rc = page.evaluate("()=>[...__rows.values()].map(r=>r.data).find(d=>d.webseite&&d.webseite.includes('muster-immo'))")
         ok('Staffel ins Angebot', rc['offer']['staffel'] == 's1')
@@ -370,10 +378,12 @@ try:
         bp = T + '/broschuere.pdf'; d.value.save_as(bp); bd = open(bp, 'rb').read()
         ok('Broschüre als PDF (%d KB)' % (len(bd) // 1024), bd[:4] == b'%PDF')
         page.click('button:has-text("Broschüre per E-Mail")'); page.wait_for_selector('#bm-ok')
+        ok('Broschüren-Texte vor dem Versand sichtbar', page.is_visible('form:has(#bm-ok) #br-beg') and 'was kann ich' in page.input_value('form:has(#bm-ok) #br-beg'))
         page.click('form:has(#bm-ok) >> button:has-text("Senden")'); page.wait_for_timeout(300)
         ok('Versand nur mit Bestätigung der Zustimmung', 'zugestimmt hat' in page.inner_text('#view') and not any('send-pdf' in u and 'muster' in (d or '') for u, a, d in fncalls))
         page.check('#bm-ok'); page.click('form:has(#bm-ok) >> button:has-text("Senden")'); page.wait_for_timeout(800)
-        ok('Broschüre gesendet und im Protokoll', any('send-pdf' in u and 'Broschuere' not in (d or '') and 'fuer_Muster' in (d or '') for u, a, d in fncalls))
+        bm = [json.loads(d) for u, a, d in fncalls if 'send-pdf' in u and 'fuer_Muster' in (d or '')]
+        ok('Broschüre gesendet mit Zustimmung und Kunde', bm and bm[-1].get('consent') is True and bm[-1].get('kind') == 'broschuere' and bm[-1].get('customerId'))
         page.screenshot(path=T + '/r-recherche.png', full_page=True)
         page.click('nav >> text=Fragenkatalog'); page.click('.chip:has-text("Anrufe heute")'); page.wait_for_selector('text=Vorschlag aus der Recherche')
         page.click('.q:has(#q-q04) >> button:has-text("Übernehmen")'); page.wait_for_timeout(400)
