@@ -898,12 +898,12 @@ async function runResearch(c){
   const url=c.webseite;if(!url)return;
   S.research[c.id]={busy:true,step:'Webseite wird gelesen …'};render._force=true;render();
   try{
-    const f=await callFn('research',{step:'fetch',url,customerId:c.id});
-    S.research[c.id]={busy:true,step:'KI wertet aus …'};render._force=true;render();
     const qs=allQs().map(q=>({id:q.id,text:q.text}));const st=cfg().staffeln.map(x=>({id:x.id,label:x.label}));
-    const base={step:'analyze',url:f.url,customerId:c.id,pages:f.pages,exp:f.exp,sig:f.sig};
+    const f=await callFn('research',{step:'fetch',url,customerId:c.id,questions:qs,staffeln:st});
+    S.research[c.id]={busy:true,step:'KI wertet aus …'};render._force=true;render();
+    const base={step:'analyze',url:f.url,customerId:c.id,pages:f.pages,questions:f.questions,staffeln:f.staffeln,rid:f.rid,exp:f.exp,sig:f.sig};
     // drei kurze Auswertungen parallel, damit keine das Zeitlimit reißt
-    const parts=await Promise.allSettled([callFn('research',Object.assign({part:'a',staffeln:st},base)),callFn('research',Object.assign({part:'b',questions:qs},base)),callFn('research',Object.assign({part:'c'},base))]);
+    const parts=await Promise.allSettled([callFn('research',Object.assign({part:'a'},base)),callFn('research',Object.assign({part:'b'},base)),callFn('research',Object.assign({part:'c'},base))]);
     const okParts=parts.filter(p=>p.status==='fulfilled');
     if(!okParts.length)throw parts[0].reason||new Error('Auswertung fehlgeschlagen.');
     const r=Object.assign({antworten:{},broschuere:{}},...okParts.map(p=>p.value.result),{at:new Date().toISOString(),url:f.url,by:(S.me&&S.me.email)||''});
@@ -915,8 +915,9 @@ async function runResearch(c){
     // leere Stammdaten automatisch füllen; Platzhalter-Firma (Domain) ersetzen
     for(const k of ['firma','adresse','telefon','email','ansprechpartner','branche']){const cv=String(fresh[k]||'').trim();if(r[k]&&(!cv||(k==='firma'&&cv===webHost(url))))patch[k]=r[k];}
     // alte Vorschläge zuerst entfernen (ersetzen statt zusammenführen), dann gezielt speichern – mit Versionsprüfung
+    const prev=fresh.recherche||null;
     await S.db.doc('customers/'+c.id).update({recherche:null});
-    await S.db.doc('customers/'+c.id).update(patch);
+    try{await S.db.doc('customers/'+c.id).update(patch);}catch(e){if(prev)await S.db.doc('customers/'+c.id).update({recherche:prev}).catch(()=>{});throw e;}
     const failed=parts.length-okParts.length;
     S.research[c.id]={busy:false,error:failed?'Teilweise fertig – '+failed+' Teil(e) nicht ausgewertet. Bei Bedarf erneut recherchieren.':''};toast('Recherche fertig');
   }catch(e){S.research[c.id]={busy:false,error:e.message};}
@@ -950,7 +951,7 @@ function researchCard(c){
       h('button',{type:'button',class:'btn primary',onclick:async()=>{try{const b=await brochurePdf(c);await S.dl.save({filename:brochureName(c),data:b});}catch(e){toast('PDF fehlgeschlagen: '+e.message);}}},'Vorab-Broschüre (PDF)'),
       h('button',{type:'button',class:'btn',onclick:()=>{S.broMail=mailOpen?null:c.id;render._force=true;render();}},'Broschüre per E-Mail')),
     mailOpen?broMailForm(c):broEditor(c,false),
-    r.quellen&&r.quellen.length?h('div',{class:'eyebrow'},'Quellen: '+[...new Set(r.quellen.map(u=>{try{const x=new URL(u);return webHost(u)+(x.pathname.length>1?x.pathname.replace(/\/$/,''):'');}catch(e){return '';}}).filter(Boolean))].join(' · ')):null);
+    r.quellen&&r.quellen.length?h('div',{class:'eyebrow',style:'overflow-wrap:anywhere;white-space:normal'},'Quellen: '+[...new Set(r.quellen.map(u=>{try{const x=new URL(u);return webHost(u)+(x.pathname.length>1?x.pathname.replace(/\/$/,''):'');}catch(e){return '';}}).filter(Boolean))].join(' · ')):null);
 }
 function brochureName(c){return ('ONLION_KI-Telefon-Agent_fuer_'+(c.firma||'Kunde')).replace(/[^\wäöüÄÖÜß.-]+/g,'_')+'.pdf';}
 function broMailForm(c){
@@ -987,7 +988,7 @@ async function brochurePdf(c){
   if(logo)doc.addImage(logo,'PNG',M,18,40,8.3,'logo','FAST');
   font(10,'bold');col(ACC);doc.text('VORAB-INFORMATION',M,42);
   let tsz=24,tl;for(;;){font(tsz,'bold');tl=doc.splitTextToSize(clean('Ihr KI-Telefon-Agent für '+(c.firma||'Ihr Unternehmen')),CW);if(tl.length<=2||tsz<=15)break;tsz-=2;}
-  if(tl.length>3){tl=tl.slice(0,3);tl[2]=tl[2].replace(/\s*\S*$/,'')+' …';}
+  if(tl.length>3){tl=tl.slice(0,3);tl[2]=tl[2].replace(/\s*\S*$/,'')+' ...';}
   col(INK);doc.text(tl,M,53);const lh=tsz*0.4;
   font(11);col(MUT);doc.text(clean('Erreichbar rund um die Uhr – ohne zusätzliches Personal.'),M,53+(tl.length-1)*lh+8);
   doc.setFillColor(...LIME);doc.rect(0,86,W,2.2,'F');y=102;

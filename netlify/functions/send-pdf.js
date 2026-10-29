@@ -49,7 +49,8 @@ exports.handler = async (event) => {
   if (!r.ok) return json(502, { error: 'Brevo hat den Versand abgelehnt: ' + (t.message || r.status) });
   // Versandprotokoll auf dem Server (unabhängig vom Browser)
   if (cid && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    await admin('/rest/v1/docs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ collection: 'versand', id: crypto.randomUUID(), data: { customerId: cid, kind, to: lc(to), by: lc(user.email), at: new Date().toISOString(), consent: kind === 'broschuere' ? true : undefined, messageId: t.messageId || null } }) }).catch(() => {});
+    await admin('/rest/v1/docs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ collection: 'versand', id: crypto.randomUUID(), data: { customerId: cid, kind, to: lc(to), by: lc(user.email), at: new Date().toISOString(), consent: kind === 'broschuere' ? true : undefined, messageId: t.messageId || null } }) })
+      .then(x => { if (!x.ok) console.error('Versandprotokoll fehlgeschlagen', x.status); }).catch(e => console.error('Versandprotokoll fehlgeschlagen', e && e.message));
   }
   return json(200, { ok: true, messageId: t.messageId || null });
 };

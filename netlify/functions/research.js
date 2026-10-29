@@ -14,7 +14,7 @@ const UA = 'Mozilla/5.0 (compatible; ONLION-Recherche/1.0)';
 const MAX_BYTES = 600 * 1024;
 const PAGE_CHARS = 5000;
 const TOTAL_CHARS = 16000;
-const FETCH_BUDGET_MS = 8000;
+const FETCH_BUDGET_MS = 7000;
 const SIG_TTL_MS = 30 * 60 * 1000;
 
 // ---------- Sicherheit: nur öffentliche Adressen (kein Zugriff auf interne Netze) ----------
@@ -50,6 +50,7 @@ function parseUrl(raw, base) {
   try { u = base ? new URL(raw, base) : new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw); } catch (e) { return null; }
   if (!/^https?:$/.test(u.protocol) || u.username || u.password) return null;
   if (!_cfg.ports.includes(u.port)) return null;
+  if (u.hostname.endsWith('.')) u.hostname = u.hostname.replace(/\.+$/, '');
   const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
   if (!host.includes('.') || net.isIP(host) || /(^|\.)(localhost|local|internal|intranet|lan|home|corp)\.?$/.test(host)) return null;
   u.hash = '';
@@ -77,7 +78,7 @@ function request(u, deadline) {
         stream.on('data', d => {
           if (done) return;
           size += d.length;
-          if (size > MAX_BYTES) { chunks.push(d.subarray(0, d.length - (size - MAX_BYTES))); req.destroy(); return fin({ status, headers, body: Buffer.concat(chunks) }); }
+          if (size > MAX_BYTES) { chunks.push(d.subarray(0, d.length - (size - MAX_BYTES))); req.destroy(); if (stream !== resp) stream.destroy(); return fin({ status, headers, body: Buffer.concat(chunks) }); }
           chunks.push(d);
         });
         stream.on('end', () => fin({ status, headers, body: Buffer.concat(chunks) }));
@@ -111,25 +112,46 @@ const cp = n => (Number.isInteger(n) && n > 0 && n <= 0x10FFFF && !(n >= 0xD800 
 const ENT = { nbsp: ' ', lt: '<', gt: '>', quot: '"', apos: "'", auml: 'ä', ouml: 'ö', uuml: 'ü', Auml: 'Ä', Ouml: 'Ö', Uuml: 'Ü', szlig: 'ß', euro: '€', ndash: '–', mdash: '—', bdquo: '„', ldquo: '“', rdquo: '”', copy: '©', reg: '®', middot: '·', eacute: 'é' };
 const decode = s => String(s).replace(/&#(\d{1,8});/g, (m, n) => cp(+n)).replace(/&#x([0-9a-f]{1,8});/gi, (m, n) => cp(parseInt(n, 16)))
   .replace(/&([a-zA-Z]+);/g, (m, n) => ENT[n] != null ? ENT[n] : (n === 'amp' ? '&' : m));
+const HTML_MAX = 200 * 1024;
+// Entfernt Blöcke wie <script>…</script> ohne Regex-Rückverfolgung (lineare Laufzeit, auch bei kaputtem HTML).
+function stripBlocks(html) {
+  const lower = html.toLowerCase(); let out = '', i = 0;
+  const tags = ['script', 'style', 'noscript', 'svg', 'template', 'iframe'];
+  while (i < html.length) {
+    const lt = lower.indexOf('<', i);
+    if (lt < 0) { out += html.slice(i); break; }
+    if (lower.startsWith('<!--', lt)) { out += html.slice(i, lt) + ' '; const e = lower.indexOf('-->', lt + 4); if (e < 0) break; i = e + 3; continue; }
+    const tag = tags.find(t => lower.startsWith(t, lt + 1) && /[\s>/]/.test(lower[lt + 1 + t.length] || '>'));
+    if (!tag) { out += html.slice(i, lt + 1); i = lt + 1; continue; }
+    out += html.slice(i, lt) + ' ';
+    const end = lower.indexOf('</' + tag, lt + 1);
+    if (end < 0) break;
+    const gt = lower.indexOf('>', end);
+    i = gt < 0 ? html.length : gt + 1;
+  }
+  return out;
+}
 function toText(html, max) {
   try {
-    return decode(String(html).replace(/<(script|style|noscript|svg|template|iframe)[\s\S]*?<\/\1>/gi, ' ').replace(/<!--[\s\S]*?-->/g, ' ')
-      .replace(/<\/(p|div|li|h[1-6]|tr|section|article|br|address|footer|header)>|<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' '))
-      .replace(/[ \t\f\v]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim().slice(0, max || PAGE_CHARS);
+    const t = stripBlocks(String(html).slice(0, HTML_MAX))
+      .replace(/<\/(p|div|li|h[1-6]|tr|section|article|br|address|footer|header)>|<br\s*\/?>/gi, '\n').replace(/<[^<>]{0,2000}>/g, ' ').replace(/[<>]/g, ' ');
+    return decode(t).replace(/[ \t\f\v]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim().slice(0, max || PAGE_CHARS);
   } catch (e) { return ''; }
 }
 function meta(html) {
-  const g = re => { try { const m = re.exec(html); return m ? decode(m[1]).trim().slice(0, 300) : ''; } catch (e) { return ''; } };
-  return { title: g(/<title[^>]*>([\s\S]*?)<\/title>/i), description: g(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)/i) || g(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']*)/i) };
+  const head = String(html).slice(0, 60000);
+  const g = re => { try { const m = re.exec(head); return m ? decode(m[1]).trim().slice(0, 300) : ''; } catch (e) { return ''; } };
+  return { title: g(/<title[^<>]{0,200}>([^<]{0,500})/i), description: g(/<meta\s[^<>]{0,300}?name=["']description["'][^<>]{0,300}?content=["']([^"'<>]{0,600})/i) || g(/<meta\s[^<>]{0,300}?property=["']og:description["'][^<>]{0,300}?content=["']([^"'<>]{0,600})/i) };
 }
 function pickLinks(html, base) {
   try {
     const want = [/impressum|imprint|legal-notice/i, /kontakt|contact/i, /leistung|angebot|service|produkt|loesung|lösung/i, /ueber-uns|über-uns|about|unternehmen|wir-sind|team/i];
     const found = [], all = [];
-    const re = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi; let m;
-    while ((m = re.exec(html)) && all.length < 400) {
+    const re = /<a\s[^<>]{0,1000}?href=["']([^"'#<>]{1,1000})["'][^<>]{0,1000}>([^]{0,600}?)<\/a>/gi; let m;
+    const src = String(html).slice(0, HTML_MAX); const bh = base.hostname.replace(/^www\./, '').replace(/\.$/, '');
+    while ((m = re.exec(src)) && all.length < 400) {
       let u; try { u = new URL(decode(m[1]), base); } catch (e) { continue; }
-      if (u.hostname.replace(/^www\./, '') !== base.hostname.replace(/^www\./, '') || !/^https?:$/.test(u.protocol)) continue;
+      if (u.hostname.replace(/^www\./, '').replace(/\.$/, '') !== bh || !/^https?:$/.test(u.protocol)) continue;
       if (/\.(pdf|jpe?g|png|gif|webp|zip|docx?|xlsx?|mp4)$/i.test(u.pathname)) continue;
       all.push({ href: u.href.split('#')[0], label: toText(m[2], 80) });
     }
@@ -164,15 +186,27 @@ async function reserve(user, b) {
 // Fehlgeschlagene Abrufe zählen nicht.
 const release = id => id ? admin('/rest/v1/docs?collection=eq.recherchen&id=eq.' + id, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {}) : null;
 const sigKey = () => 'onlion-research:' + process.env.SUPABASE_SERVICE_ROLE_KEY;
-function sign(pages, email, cid, exp) {
-  return crypto.createHmac('sha256', sigKey()).update(JSON.stringify({ pages, email: lc(email), cid: String(cid || ''), exp })).digest('hex');
+const normQs = v => (Array.isArray(v) ? v : []).slice(0, 60).map(q => ({ id: String(q && q.id).slice(0, 20), text: String(q && q.text).slice(0, 300) }));
+const normSt = v => (Array.isArray(v) ? v : []).slice(0, 8).map(x => ({ id: String(x && x.id).slice(0, 10), label: String(x && x.label).slice(0, 60) }));
+// Signiert alles, was die KI später sieht – so wertet sie nur aus, was beim (gezählten) Lesen festgelegt wurde.
+function sign(d, email, cid) {
+  return crypto.createHmac('sha256', sigKey()).update(JSON.stringify({ pages: d.pages, questions: d.questions, staffeln: d.staffeln, rid: d.rid, exp: d.exp, email: lc(email), cid: String(cid || '') })).digest('hex');
 }
 function verify(b, user) {
   const exp = Number(b.exp);
-  if (!Array.isArray(b.pages) || !b.pages.length || typeof b.sig !== 'string' || !Number.isFinite(exp) || exp < Date.now() || exp > Date.now() + SIG_TTL_MS + 60000) return false;
-  const pages = b.pages.map(p => ({ url: String(p && p.url), text: String(p && p.text) }));
-  const want = Buffer.from(sign(pages, user.email, b.customerId, exp), 'hex'), got = Buffer.from(b.sig, 'hex');
-  return want.length === got.length && crypto.timingSafeEqual(want, got);
+  if (!Array.isArray(b.pages) || !b.pages.length || typeof b.sig !== 'string' || typeof b.rid !== 'string' || !/^[\w-]{1,60}$/.test(b.rid) || !Number.isFinite(exp) || exp < Date.now() || exp > Date.now() + SIG_TTL_MS + 60000) return null;
+  const d = { pages: b.pages.map(p => ({ url: String(p && p.url), text: String(p && p.text) })), questions: normQs(b.questions), staffeln: normSt(b.staffeln), rid: b.rid, exp };
+  const want = Buffer.from(sign(d, user.email, b.customerId), 'hex'), got = Buffer.from(b.sig, 'hex');
+  return want.length === got.length && crypto.timingSafeEqual(want, got) ? d : null;
+}
+// Jeder Teil darf je Recherche höchstens zweimal ausgewertet werden (einmal plus eine Wiederholung).
+async function claimPart(rid, part) {
+  for (const n of [1, 2]) {
+    const r = await admin('/rest/v1/docs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ collection: 'recherche-teile', id: rid + '-' + part + '-' + n, data: { at: new Date().toISOString() } }) }).catch(() => null);
+    if (r && r.ok) return true;
+    if (!r || r.status !== 409) return false;
+  }
+  return false;
 }
 
 // ---------- Claude ----------
@@ -184,7 +218,7 @@ function buildPrompt(part, b) {
   const pages = b.pages.slice(0, 5).map(p => ({ url: String(p.url).slice(0, 300), text: String(p.text).slice(0, PAGE_CHARS) }));
   let schema = '';
   if (part === 'a') {
-    const staffeln = (Array.isArray(b.staffeln) ? b.staffeln : []).slice(0, 8).map(s => ({ id: String(s.id).slice(0, 10), label: String(s.label).slice(0, 60) }));
+    const staffeln = b.staffeln;
     schema = `Schema:
 {
  "firma": string, "adresse": string, "telefon": string, "email": string,
@@ -197,7 +231,7 @@ function buildPrompt(part, b) {
  "ansatzpunkte": string[] (max. 5: warum ein KI-Telefon-Agent dieser Firma konkret helfen könnte)
 }`;
   } else if (part === 'b') {
-    const qs = (Array.isArray(b.questions) ? b.questions : []).slice(0, 60).map(q => ({ id: String(q.id).slice(0, 20), text: String(q.text).slice(0, 300) }));
+    const qs = b.questions;
     schema = `Schema: { "antworten": { [frage-id]: string } }
 Nur Fragen aus dieser Liste, die sich aus der Webseite plausibel vorab beantworten lassen; knapp, als Vermutung formuliert. Alle anderen weglassen.
 Fragenkatalog: ${JSON.stringify(qs)}`;
@@ -236,8 +270,7 @@ function clean(part, o, b) {
   const br = (o && o.broschuere) || {};
   return { broschuere: { begruessung: str(br.begruessung, 400), anliegen: arr(br.anliegen, 7), weiterleitungen: arr(br.weiterleitungen, 5), nutzen: arr(br.nutzen, 5, 250) } };
 }
-async function askClaude(prompt, maxTokens) {
-  const ms = Number(process.env.RESEARCH_TIMEOUT_MS) || 9200;
+async function askClaude(prompt, maxTokens, ms) {
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -254,6 +287,7 @@ async function askClaude(prompt, maxTokens) {
 }
 
 exports.handler = async (event) => {
+  const t0 = Date.now(); // alle Fristen ab Start der Anfrage (Netlify bricht nach 10 s ab)
   if (event.httpMethod !== 'POST') return json(405, { error: 'Nur POST erlaubt.' });
   const b = parseBody(event);
   if (!b) return json(400, { error: 'Ungültige Anfrage.' });
@@ -269,7 +303,7 @@ exports.handler = async (event) => {
     if (!parseUrl(String(b.url || '').trim())) return json(400, { error: 'Bitte eine öffentliche Webseiten-Adresse eintragen (z. B. www.firma.de).' });
     const q = await reserve(user, b);
     if (!q.ok) return json(q.status, { error: q.error });
-    const deadline = Date.now() + FETCH_BUDGET_MS;
+    const deadline = t0 + FETCH_BUDGET_MS;
     const home = await getPage(String(b.url || '').trim(), deadline);
     if (!home) { await release(q.id); return json(400, { error: 'Die Webseite ist nicht erreichbar oder keine öffentliche Adresse.' }); }
     const base = new URL(home.url);
@@ -278,19 +312,23 @@ exports.handler = async (event) => {
       .filter(p => p.text.length > 40);
     if (!pages.length) { await release(q.id); return json(400, { error: 'Auf der Webseite wurde kein lesbarer Text gefunden.' }); }
     const exp = Date.now() + SIG_TTL_MS;
-    return json(200, { url: home.url, meta: meta(home.html), pages, exp, sig: sign(pages, user.email, b.customerId, exp) });
+    const d = { pages, questions: normQs(b.questions), staffeln: normSt(b.staffeln), rid: q.id, exp };
+    return json(200, { url: home.url, meta: meta(home.html), pages, questions: d.questions, staffeln: d.staffeln, rid: q.id, exp, sig: sign(d, user.email, b.customerId) });
   }
 
   if (b.step === 'analyze') {
     const part = ['a', 'b', 'c'].includes(b.part) ? b.part : 'a';
-    if (!verify(b, user)) return json(400, { error: 'Die gelesenen Inhalte sind abgelaufen oder ungültig. Bitte die Recherche neu starten.' });
-    if (part === 'b' && !(Array.isArray(b.questions) && b.questions.length)) return json(200, { result: { antworten: {} } });
-    const c = await askClaude(buildPrompt(part, b), MAX_TOKENS[part]);
+    const d = verify(b, user);
+    if (!d) return json(400, { error: 'Die gelesenen Inhalte sind abgelaufen oder ungültig. Bitte die Recherche neu starten.' });
+    if (part === 'b' && !d.questions.length) return json(200, { result: { antworten: {} } });
+    if (!(await claimPart(d.rid, part))) return json(429, { error: 'Diese Recherche wurde schon ausgewertet. Bitte neu recherchieren.' });
+    const limit = Number(process.env.RESEARCH_TIMEOUT_MS) || 9000;
+    const c = await askClaude(buildPrompt(part, d), MAX_TOKENS[part], Math.max(1500, limit - (Date.now() - t0)));
     if (c.error) return json(c.status, { error: c.error });
     const o = parseJson(c.text);
     if (!o) return json(502, { error: 'Die KI-Antwort war nicht lesbar. Bitte erneut versuchen.' });
-    return json(200, { result: clean(part, o, b) });
+    return json(200, { result: clean(part, o, d) });
   }
   return json(400, { error: 'Unbekannter Schritt.' });
 };
-exports._test = { privateIp, decode, decodeBody, parseUrl, _cfg };
+exports._test = { privateIp, decode, decodeBody, parseUrl, toText, meta, pickLinks, _cfg };
