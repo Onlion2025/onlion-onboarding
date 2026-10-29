@@ -4,3 +4,4 @@ node_modules/
 tests/out.pdf
 tests/gutschrift.pdf
 tests/*.png
+tests/leads.csv

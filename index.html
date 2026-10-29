@@ -372,7 +372,8 @@ function stageState(c,id){
 }
 function fmtDate(iso){try{return new Date(iso).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'});}catch(e){return iso;}}
 function fill(text,c){
-  let l=c.legal||{}; const today=new Date().toLocaleDateString('de-DE');
+  if(signed(c)&&c.signature.stamm)c=Object.assign({},c,c.signature.stamm); // unterschriebene Fassung
+  let l=c.legal||{}; const today=(signed(c)?new Date(c.signature.signedAt):new Date()).toLocaleDateString('de-DE');
   const T=v=>String(v||'').replace(/\s+/g,' ').trim();c=Object.assign({},c,{firma:T(c.firma),adresse:T(c.adresse),ansprechpartner:T(c.ansprechpartner)});l=Object.assign({},l,{dsb:T(l.dsb),speicherung:T(l.speicherung)});
   const map={firma:c.firma||'[Firma]',adresse:c.adresse||'[Adresse]',vertreter:c.ansprechpartner||'[Ansprechpartner]',dsb:l.dsb||'[Datenschutzbeauftragter]',speicherung:l.speicherung||'[Speicherung]',datum:today};
   return String(text||'').replace(/\{\{\s*(\w+)\s*\}\}/g,(m,k)=>k in map?map[k]:m);
