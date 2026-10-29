@@ -202,11 +202,11 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
   .side .label{display:none}
   .side #custGroup .label,.side #prodGroup .label{display:block;margin-top:2px}
   #flowNav{display:none!important}
-  #custList{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
-  #custList .navbtn{width:auto;flex:none;white-space:nowrap;padding:8px 14px}
+  #custList{display:flex;gap:8px;flex-wrap:wrap}
+  #custList .navbtn{width:auto;flex:0 1 auto;padding:8px 14px;min-width:0}
   #custList .navbtn small{display:inline;margin-left:6px}
-  #prodList{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
-  #prodList .navbtn{width:auto;flex:none;white-space:nowrap;padding:8px 14px}
+  #prodList{display:flex;gap:8px;flex-wrap:wrap}
+  #prodList .navbtn{width:auto;flex:0 1 auto;padding:8px 14px;min-width:0}
   #prodList .navbtn small{display:inline;margin-left:6px}
   .side .group.settings{flex-direction:row;flex-wrap:wrap;gap:6px}
   .side .group.settings .navbtn{width:auto;min-height:44px;padding:8px 12px;font-size:14px}
@@ -367,7 +367,7 @@ function prodNav(){return prodAll().filter(p=>isAdmin()||p.status!=='entwurf');}
 function staffelnOf(pid){pid=pid||DEF_PID;if(pid===DEF_PID)return cfg().staffeln;const p=prodById(pid);return (p&&Array.isArray(p.staffeln))?p.staffeln:[];}
 function allStaffeln(){return prodAll().flatMap(p=>staffelnOf(p.id).map(s=>Object.assign({},s,{pid:p.id,pname:p.name})));}
 function staffelById(id){return allStaffeln().find(s=>s.id===id)||null;}
-function prodRates(pid){const p=prodById(pid||DEF_PID);return p&&p.rates?p.rates:null;}
+
 function saveProdukte(items){S.produkte={items};return S.db.doc('config/produkte').set({items});}
 function custOf(pid){return S.customers.filter(c=>prodsOf(c).includes(pid));}
 function allQs(){return S.tpl&&Array.isArray(S.tpl.sections)?S.tpl.sections.flatMap(s=>s.questions||[]):[];}
@@ -492,9 +492,13 @@ async function createCustomer(data){
   return ref.id;
 }
 /* Produkt zu einem Kunden hinzufügen bzw. (ohne Unterschrift und Zahlungen) wieder entfernen */
-function addProd(c,pid){c=rawOf(c);const l=prodsOf(c);if(l.includes(pid))return Promise.resolve();l.push(pid);const local=S.customers.find(x=>x.id===c.id);if(local)local.prods=l;return S.db.doc('customers/'+c.id).update({prods:l,updatedAt:new Date().toISOString()});}
+function addProd(c,pid){c=rawOf(c);const l=prodsOf(c);if(l.includes(pid))return Promise.resolve();l.push(pid);const local=S.customers.find(x=>x.id===c.id);if(local)local.prods=l;return S.db.doc('customers/'+c.id).update({__prodsAdd:[pid],updatedAt:new Date().toISOString()});}
 function obRemovable(o){return !signed(o)&&!(o.history||[]).length&&!S.zahl.some(z=>z.customerId===o.id&&(z.produkt||DEF_PID)===pidOf(o));}
-async function removeProd(c,pid){c=rawOf(c);const l=prodsOf(c).filter(x=>x!==pid);const up={prods:l,updatedAt:new Date().toISOString()};if(pid!==DEF_PID){up.ob={};up.ob[pid]=null;}await S.db.doc('customers/'+c.id).update(up);}
+async function removeProd(c,pid){c=rawOf(c);const up={__prodsDel:[pid],updatedAt:new Date().toISOString()};
+  if(pid!==DEF_PID){up.ob={};up.ob[pid]=null;}
+  else Object.assign(up,{answers:null,na:null,legal:null,signature:null,history:null,pdfAt:null,sentAt:null,sentTo:null,offer:null});
+  const local=S.customers.find(x=>x.id===c.id);if(local)local.prods=prodsOf(local).filter(x=>x!==pid);
+  await S.db.doc('customers/'+c.id).update(up);}
 
 /* ---------- sidebar ---------- */
 function newCustForm(){
@@ -711,7 +715,8 @@ function checkSign(){
   const ok=S.pads.kunde&&!S.pads.kunde.st.empty&&S.pads.onlion&&!S.pads.onlion.st.empty&&(document.getElementById('sg-name')||{}).value&&(document.getElementById('sg-ort')||{}).value;
   b.disabled=!ok||!!S.signBlocked;
 }
-function canonical(c,extra){
+function canonical(c,extra){return inProd(pidOf(c),()=>canonical0(c,extra));}
+function canonical0(c,extra){
   const legalTexts=legalDocs().map(d=>({title:d.title,body:fill(d.body,c)}));
   const qa=allQs().map(q=>({q:q.text,a:isNA(c,q)?'entfällt':((c.answers||{})[q.id]||'')}));
   return JSON.stringify({firma:c.firma||'',adresse:c.adresse||'',ansprechpartner:c.ansprechpartner||'',email:c.email||'',telefon:c.telefon||'',qa,legal:c.legal||{},legalTexts,extra});
@@ -789,6 +794,10 @@ function viewUnterschrift(c){
 function clean(s){return String(s==null?'':s).replace(/[„“”]/g,'"').replace(/[‚‘’]/g,"'").replace(/[–—]/g,'-').replace(/…/g,'...').replace(/€/g,'EUR').replace(/★/g,'*').replace(/[^\x00-\xFF\n]/g,'');}
 async function imgData(url){const r=await fetch(url);const b=await r.blob();return await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(b);});}
 async function buildPdf(c){
+  let logo=null;try{logo=await imgData('logo-black.png');}catch(e){}
+  return inProd(pidOf(c),()=>buildPdfSync(c,logo));
+}
+function buildPdfSync(c,logo){
   if(signed(c)&&c.signature.stamm)c=Object.assign({},c,c.signature.stamm);
   const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'mm',format:'a4'});
   const W=210,M=18,CW=W-2*M,BOT=276; let y=0;
@@ -798,7 +807,6 @@ async function buildPdf(c){
   const font=(sz,st)=>{doc.setFont('helvetica',st||'normal');doc.setFontSize(sz);};
   const lh=sz=>sz*0.42;
   const wrap=(t,sz,st,w)=>{font(sz,st);return doc.splitTextToSize(clean(t),w||CW);};
-  let logo=null;try{logo=await imgData('logo-black.png');}catch(e){}
   const firma=T(c.firma)||'Ohne Namen';
   const head=()=>{
     if(logo)doc.addImage(logo,'PNG',M,11,30,6.2,'logo','FAST');
@@ -1055,7 +1063,7 @@ function viewProdukte(){
       h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Anlegen'),h('button',{type:'button',class:'btn',onclick:()=>{S.newProd=null;render();}},'Abbrechen')))));
   const tab=PROD_TABS.some(t=>t[0]===S.prodTab)?S.prodTab:'daten';
   out.push(h('div',{class:'chips',role:'tablist','aria-label':'Bereiche'},...PROD_TABS.map(([k,l])=>h('button',{type:'button',role:'tab',class:'chip'+(tab===k?' on':''),'aria-selected':tab===k?'true':'false',onclick:()=>{S.prodTab=k;render();}},l))));
-  out.push(...({daten:prodDaten,preise:prodPreise,provision:prodProvision,fragen:prodFragen,recht:prodRecht}[tab])(p));
+  out.push(...({daten:prodDaten,preise:prodPreise,fragen:prodFragen,recht:prodRecht}[tab])(p));
   return out;
 }
 function prodDaten(p){
@@ -1087,22 +1095,6 @@ function prodPreise(p){
     h('div',{class:'row'},h('button',{type:'button',class:'btn ghost-dashed',onclick:()=>{st.push({id:p.id+'-s'+Date.now().toString(36),label:'Neue Staffel',einrichtung:0,lizenz:0});draw();}},'+ Staffel'),
       h('button',{type:'button',class:'btn primary',onclick:async()=>{if(st.some(x=>!String(x.label).trim())){toast('Bitte jede Staffel benennen.');return;}if(p.id===DEF_PID)await saveCfg({staffeln:st});else await updProd(p.id,{staffeln:st});toast('Preise gespeichert');render();}},'Speichern')),
     h('div',{class:'eyebrow'},'Neue Preise gelten für neu gewählte Staffeln im Angebot. Bestehende Angebote bleiben unverändert.'))];
-}
-function prodProvision(p){
-  const std=versionAt(todayStr()).rates||{};const own=!!p.rates;
-  const R=JSON.parse(JSON.stringify(p.rates||std));
-  const L=['Verkäufer','Ebene 1','Ebene 2'];
-  const num=(k,i,unit)=>h('div',{class:'field'},h('label',{for:'pr-'+k+i},L[i]+(unit?' ('+unit+')':'')),h('input',{type:'number',id:'pr-'+k+i,min:'0',max:k==='lizenzMonate'?'120':'100',step:k==='lizenzMonate'?'1':'0.5',disabled:!own,value:String(Number((R[k]||[])[i])||0),oninput:e=>{R[k]=R[k]||[0,0,0];R[k][i]=Math.max(0,parseFloat(e.target.value)||0);}}));
-  return [h('section',{class:'card'},h('h2',null,'Provision · '+p.name),
-    h('div',{class:'chips'},
-      h('button',{type:'button',class:'chip'+(own?'':' on'),'aria-pressed':own?'false':'true',onclick:async()=>{if(!own)return;await updProd(p.id,{rates:null});toast('Es gilt wieder das Standardmodell');render();}},'Standardmodell'),
-      h('button',{type:'button',class:'chip'+(own?' on':''),'aria-pressed':own?'true':'false',onclick:async()=>{if(own)return;await updProd(p.id,{rates:JSON.parse(JSON.stringify(Object.assign({aktivQuartale:std.aktivQuartale||0},std)))});toast('Eigene Sätze angelegt – jetzt anpassen');render();}},'Eigene Sätze')),
-    own?null:h('div',{class:'eyebrow'},'Es gilt das Modell unter Vertrieb → Provisionsmodell: Einrichtung '+(std.einrichtung||[]).map(pct).join(' / ')+' · Lizenz '+(std.lizenz||[]).map(pct).join(' / ')+' für '+(std.lizenzMonate||[]).join(' / ')+' Monate.'),
-    h('h3',null,'Anteil an der Einrichtung'),h('div',{class:'grid2'},...[0,1,2].map(i=>num('einrichtung',i,'%'))),
-    h('h3',null,'Anteil an der Lizenz'),h('div',{class:'grid2'},...[0,1,2].map(i=>num('lizenz',i,'%'))),
-    h('h3',null,'Laufzeit der Lizenzprovision'),h('div',{class:'grid2'},...[0,1,2].map(i=>num('lizenzMonate',i,'Monate'))),
-    own?h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async()=>{const tot=(R.einrichtung||[]).reduce((a,b)=>a+(Number(b)||0),0);if(tot>100){toast('Zusammen höchstens 100 % der Einrichtung.');return;}await updProd(p.id,{rates:R});toast('Provisionssätze gespeichert');render();}},'Speichern')):null,
-    h('div',{class:'eyebrow'},'Gilt für Einrichtungen, die ab jetzt gebucht werden. Bereits gebuchte Kunden behalten ihre Sätze. Sonderkonditionen einzelner Partner, Aktivitätsbedingung und Incentive-Aktionen gelten zusätzlich.'))];
 }
 function prodFragen(p){
   const t=S.tpls[p.id];
@@ -1390,16 +1382,26 @@ function goalCard(){
     ziel?h('div',{class:'pbar',role:'img','aria-label':'Umsatzziel '+pctZiel+' %'},h('div',{style:'width:'+pctZiel+'%'})):null);
 }
 function offerNet(c){return offerTotals((c.offer&&c.offer.items)||[]).net;}
+/* Status im Dashboard: ohne Filter der Firmenstatus, mit Produktfilter der Stand dieses Produkts */
+function statFor(c,pid){
+  if(!pid)return stat(c);const o=obView(c,pid),b=crmOf(c).status||'neu';
+  if(b==='verloren')return 'verloren';
+  if(S.zahl.some(z=>z.customerId===c.id&&(z.produkt||DEF_PID)===pid&&z.art==='einrichtung'&&!z.storniert)||(b==='abgeschlossen'&&prodsOf(c).length===1&&signed(o)))return 'abgeschlossen';
+  if(signed(o))return 'unterschrieben';
+  let r=Math.min(CRM_RANK[b]||0,2);for(const e of (crmOf(c).history||[]))if((CRM_RANK[e.s]||0)<3)r=Math.max(r,CRM_RANK[e.s]||0);
+  return ['neu','angerufen','termin'][r];
+}
+function reachedFor(c,pid){if(!pid)return reached(c);const o=obView(c,pid);let r=CRM_RANK[statFor(c,pid)]||0;for(const e of (crmOf(c).history||[]))if((CRM_RANK[e.s]||0)<3)r=Math.max(r,CRM_RANK[e.s]||0);if(signed(o)||(o.history||[]).length)r=Math.max(r,CRM_RANK.unterschrieben);return r;}
 function offerAll(c){const pid=S.dashProd;return obsOf(c).filter(o=>!pid||pidOf(o)===pid).reduce((t,o)=>t+offerNet(o),0);}
 function viewDashboard(){
   const multi=prodNav().length>1;if(S.dashProd&&!prodById(S.dashProd))S.dashProd='';
   const cs=S.dashProd?custOf(S.dashProd):S.customers,n=cs.length,today=todayStr(),month=today.slice(0,7);
   const in7=(()=>{const d=new Date();d.setDate(d.getDate()+7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
   const locMonth=iso=>{const d=new Date(iso);return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');};
-  const by={};for(const st of CRM)by[st.id]=[];for(const c of cs)(by[stat(c)]||by.neu).push(c);
+  const by={};for(const st of CRM)by[st.id]=[];for(const c of cs)(by[statFor(c,S.dashProd)]||by.neu).push(c);
   const won=by.abgeschlossen,lost=by.verloren;
   const openStates=['neu','angerufen','termin','unterschrieben'];
-  const openVal=cs.filter(c=>openStates.includes(stat(c))).reduce((s,c)=>s+offerAll(c),0);
+  const openVal=cs.filter(c=>openStates.includes(statFor(c,S.dashProd))).reduce((s,c)=>s+offerAll(c),0);
   const wonVal=won.reduce((s,c)=>s+offerAll(c),0);
   const newM=cs.filter(c=>locMonth(c.createdAt)===month).length;
   const decided=won.length+lost.length;
@@ -1418,13 +1420,13 @@ function viewDashboard(){
   // Trichter: wie viele haben die Stufe mindestens erreicht
   const fun=h('div',{class:'funnel'});
   [['Kunden',0],['Angerufen',1],['Termin vereinbart',2],['Unterschrieben',3],['Abgeschlossen',4]].forEach(([l,r])=>{
-    const k=r===4?won.length:cs.filter(c=>reached(c)>=r).length;const pct=n?Math.round(k/n*100):0;
+    const k=r===4?won.length:cs.filter(c=>reachedFor(c,S.dashProd)>=r).length;const pct=n?Math.round(k/n*100):0;
     fun.append(h('div',{class:'frow'},h('div',null,l),h('div',{class:'fb',role:'img','aria-label':l+': '+k+' von '+n},h('div',{style:'width:'+pct+'%'})),h('div',{class:'fv'},k+' · '+pct+' %')));
   });
   const open=c=>openKunde(c.id);
   // Termine und Wiedervorlagen
-  const terms=cs.filter(c=>crmOf(c).termin&&!['abgeschlossen','verloren','unterschrieben'].includes(stat(c))&&(crmOf(c).termin.slice(0,10)>=today||stat(c)==='termin')).sort((a,b)=>crmOf(a).termin<crmOf(b).termin?-1:1);
-  const wvs=cs.filter(c=>crmOf(c).wv&&!['abgeschlossen','verloren'].includes(stat(c))).sort((a,b)=>crmOf(a).wv<crmOf(b).wv?-1:1);
+  const terms=cs.filter(c=>crmOf(c).termin&&!['abgeschlossen','verloren','unterschrieben'].includes(statFor(c,S.dashProd))&&(crmOf(c).termin.slice(0,10)>=today||statFor(c,S.dashProd)==='termin')).sort((a,b)=>crmOf(a).termin<crmOf(b).termin?-1:1);
+  const wvs=cs.filter(c=>crmOf(c).wv&&!['abgeschlossen','verloren'].includes(statFor(c,S.dashProd))).sort((a,b)=>crmOf(a).wv<crmOf(b).wv?-1:1);
   const tl=h('div',{class:'dlist'});
   if(!terms.length)tl.append(h('div',{class:'eyebrow'},'Keine anstehenden Termine.'));
   for(const c of terms.slice(0,8)){const past=crmOf(c).termin.slice(0,10)<today;tl.append(h('button',{type:'button',class:'ditem',onclick:()=>open(c)},h('span',{class:'dn'},c.firma||'Ohne Namen'),h('span',{class:'dd'+(past?' late':'')},(past?'Vorbei, Ergebnis eintragen · ':'')+fmtDay(crmOf(c).termin))));}
@@ -1437,7 +1439,7 @@ function viewDashboard(){
   for(const c of list){
     const dl=new Set(crmOf(c).logDel||[]);const last=(crmOf(c).log||[]).find(e=>!dl.has(e.id||(e.at+'|'+e.by)));
     tb.append(h('tr',{class:'clk',tabindex:'0',onclick:()=>open(c),onkeydown:e=>{if(e.key==='Enter')open(c);}},
-      h('td',null,h('strong',null,c.firma||'Ohne Namen'),multi&&!S.dashProd&&prodsOf(c).length?h('div',{class:'eyebrow'},prodsOf(c).map(prodName).join(' · ')):null),h('td',null,statEl(stat(c))),
+      h('td',null,h('strong',null,c.firma||'Ohne Namen'),multi&&!S.dashProd&&prodsOf(c).length?h('div',{class:'eyebrow'},prodsOf(c).map(prodName).join(' · ')):null),h('td',null,statEl(statFor(c,S.dashProd))),
       h('td',{class:'hide-m'},crmOf(c).termin?fmtDay(crmOf(c).termin):'–'),
       h('td',{class:'hide-m'},last?fmtDate(last.at)+' · '+last.type:'–'),
       h('td',{class:'num'+(offerAll(c)?'':' hide-m')},offerAll(c)?eur(offerAll(c)):'–')));
@@ -1448,7 +1450,7 @@ function viewDashboard(){
     multi?h('div',{class:'chips',role:'group','aria-label':'Produkt'},...[{id:'',name:'Alle Produkte'}].concat(prodNav()).map(p=>h('button',{type:'button',class:'chip'+((S.dashProd||'')===p.id?' on':''),'aria-pressed':(S.dashProd||'')===p.id?'true':'false',onclick:()=>{S.dashProd=p.id;S.dashFilter='';render();}},p.name))):null,
     isAdmin()?goalCard():null,
     kpis,
-    h('section',{class:'card'},h('h2',null,'Status der Kunden'),pipe),
+    h('section',{class:'card'},h('h2',null,S.dashProd?'Status bei '+prodName(S.dashProd):'Status der Kunden'),pipe),
     h('section',{class:'card'},h('h2',null,'Vom Kontakt zum Abschluss'),fun),
     h('div',{class:'cols2'},h('section',{class:'card'},h('h2',null,'Nächste Termine'),tl),h('section',{class:'card'},h('h2',null,'Wiedervorlagen'),wl)),
     h('section',{class:'card'},h('div',{class:'row'},h('h2',null,f?'Kunden: '+statT(f):'Alle Kunden'),h('div',{class:'spacer'}),f?h('button',{type:'button',class:'btn',onclick:()=>{S.dashFilter='';render();}},'Filter aufheben'):null),table)
@@ -1503,11 +1505,10 @@ function computeRows(z,batch){
   const out=[];const seller=String(z.partner||'').toLowerCase();if(!seller||z.netto<=0)return out;
   const chain=[seller];let cur=seller;for(let i=0;i<2;i++){const sp=sponsorOf(cur);if(!sp||chain.includes(sp))break;chain.push(sp);cur=sp;}
   // Konditionen: Einrichtung nach Modell am Zahlungstag; Lizenz nach den Konditionen, die bei der Einrichtung galten
-  let v=versionAt(z.datum),sonder=(tm(seller)||{}).sonder||null,idx=1,pr=z.prodRates||null;
-  if(z.art==='lizenz'){const e0=setupOf(z.customerId,batch,z.produkt||DEF_PID);if(e0){v=versionById(e0.version)||versionAt(e0.datum);sonder=e0.sonder||null;pr=e0.prodRates||null;idx=monthsBetween(e0.lizenzStart||String(e0.datum).slice(0,7),z.monat)+1;}}
+  let v=versionAt(z.datum),sonder=(tm(seller)||{}).sonder||null,idx=1;
+  if(z.art==='lizenz'){const e0=setupOf(z.customerId,batch,z.produkt||DEF_PID);if(e0){v=versionById(e0.version)||versionAt(e0.datum);sonder=e0.sonder||null;idx=monthsBetween(e0.lizenzStart||String(e0.datum).slice(0,7),z.monat)+1;}}
   else if(z.sonder!==undefined)sonder=z.sonder;
-  // eigene Sätze eines Produkts (bei der Einrichtung festgehalten) gehen dem allgemeinen Modell vor
-  const R=pr||v.rates||{};const zahlPool=S.zahl.concat(batch||[]);
+  const R=v.rates||{};const zahlPool=S.zahl.concat(batch||[]);
   const akts=z.art==='einrichtung'?aktionenAt(z.datum):[];
   const firstSale=!zahlPool.some(x=>x.id!==z.id&&x.partner===seller&&x.art==='einrichtung'&&!x.storniert&&x.netto>0)&&!liveProv().some(r=>r.von===seller&&r.ebene===1&&(r.starthilfe||(r.aktion&&(cfg().aktionen.find(a=>a.id===r.aktion)||{}).typ==='starthilfe')));
   const stp=tm(seller)||{};const joined=String(stp.vertrag_am||stp.added_at||'').slice(0,10);
@@ -1546,7 +1547,7 @@ async function bookPayments(list){
   for(const it of list){
     const c=it.customer;const z={id:uid(),customerId:c.id,firma:c.firma||'',partner:String(c.partner||'').toLowerCase(),art:it.art,netto:r2(it.netto),datum:it.datum,monat:it.art==='lizenz'?it.monat:'',storniert:false,by:(S.me&&S.me.email)||'',at:new Date().toISOString()};
     z.produkt=pidOf(c);
-    if(it.art==='einrichtung'){z.staffel=((c.offer||{}).staffel)||'';z.version=versionAt(z.datum).id;const prr=prodRates(pidOf(c));if(prr)z.prodRates=JSON.parse(JSON.stringify(prr));z.sonder=(tm(z.partner)||{}).sonder||null;z.lizenzVertrag=r2(it.lizenzVertrag!=null?it.lizenzVertrag:custOffer(c).lizenz);z.lizenzStart=it.lizenzStart||String(z.datum).slice(0,7);}
+    if(it.art==='einrichtung'){z.staffel=((c.offer||{}).staffel)||'';z.version=versionAt(z.datum).id;z.sonder=(tm(z.partner)||{}).sonder||null;z.lizenzVertrag=r2(it.lizenzVertrag!=null?it.lizenzVertrag:custOffer(c).lizenz);z.lizenzStart=it.lizenzStart||String(z.datum).slice(0,7);}
     const rs=computeRows(z,zs);zs.push(z);rows.push(...rs);
   }
   await S.db.bulk('zahlungen',zs);
@@ -1971,7 +1972,7 @@ function vtZahlungen(){
   const tb=h('tbody');
   for(const z of zs.slice(0,300)){const pv=r2(S.prov.filter(p=>p.zahlungId===z.id&&p.status!=='storniert'&&!p.storno).reduce((s,p)=>s+p.betrag,0));
     tb.append(h('tr',{class:'clk',onclick:()=>{if(S.customers.some(c=>c.id===z.customerId))openOb(z.customerId,z.produkt||DEF_PID);}},h('td',{class:'hide-m'},fmtDay(z.datum).replace(/^\w+\.,\s*/,'')),h('td',null,h('strong',null,z.firma||'–'),h('div',{class:'eyebrow'},(z.art==='einrichtung'?'Einrichtung':'Lizenz '+fmtMonth(z.monat))+(z.storniert?' · storniert':''))),h('td',{class:'hide-m'},z.partner?pname(z.partner):'Direkt'),h('td',{class:'num'},eur(z.netto)),h('td',{class:'num'},h('span',{class:'m-only'},'Provision '),z.partner&&!z.storniert?eur(pv):'–')));}
-  out.push(h('section',{class:'card'},h('h2',null,'Alle Zahlungen'),zs.length?h('table',{class:'ctable'},h('thead',null,h('tr',null,h('th',{class:'hide-m'},'Datum'),h('th',null,'Kunde'),h('th',{class:'hide-m'},'Partner'),h('th',{class:'num'},'Netto'),h('th',{class:'num'},'Provision'))),tb):h('div',{class:'eyebrow'},'Noch keine Zahlungen. Einzelne Zahlungen verbuchst du in der Kundenakte unter „Vertriebspartner & Zahlungen“.'),
+  out.push(h('section',{class:'card'},h('h2',null,'Alle Zahlungen'),zs.length?h('table',{class:'ctable'},h('thead',null,h('tr',null,h('th',{class:'hide-m'},'Datum'),h('th',null,'Kunde'),h('th',{class:'hide-m'},'Partner'),h('th',{class:'num'},'Netto'),h('th',{class:'num'},'Provision'))),tb):h('div',{class:'eyebrow'},'Noch keine Zahlungen. Einzelne Zahlungen verbuchst du in der Kundenakte im jeweiligen Onboarding unter „Zahlungen“.'),
     h('div',{class:'eyebrow'},'Stornieren geht in der jeweiligen Kundenakte.')));
   return out;
 }
@@ -2141,6 +2142,8 @@ function makeDb(sb){
         for(let i=0;i<4;i++){
           const row=await fetchRow(col,id);if(!row)throw new Error('Datensatz nicht gefunden');const cur=row.data;
           const pp=JSON.parse(JSON.stringify(p));if(pp.crm&&typeof pp.crm==='object')Object.assign(pp.crm,mergeCrm((cur.crm)||{},pp.crm));
+          // Produkte hinzufügen/entfernen gegen den aktuellen Stand rechnen (gleichzeitige Änderungen gehen nicht verloren)
+          if(pp.__prodsAdd||pp.__prodsDel){let l=Array.isArray(cur.prods)?cur.prods.slice():['ki-telefon-agent'];for(const x of pp.__prodsAdd||[])if(!l.includes(x))l.push(x);l=l.filter(x=>!(pp.__prodsDel||[]).includes(x));pp.prods=l;delete pp.__prodsAdd;delete pp.__prodsDel;}
           if(await writeIf(col,id,deepMerge(JSON.parse(JSON.stringify(cur)),pp),row.updated_at)){notify(col);return;}
           await new Promise(r=>setTimeout(r,80+Math.random()*200));
         }
