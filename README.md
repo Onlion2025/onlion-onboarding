@@ -76,6 +76,12 @@ In Netlify unter **Site configuration → Environment variables** diese Werte an
 
 Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist. Die Schlüssel verlassen den Server nie.
 
+### Update: Produkte (Oktober 2026)
+- Menü: Überblick (Dashboard, Vertrieb), Kunden (Alle Kunden, + Neuer Kunde), Produkte (je Produkt eine Seite), Einstellungen (Produkte verwalten, Konto & Team).
+- Ein Kunde (Firma) wird nur einmal angelegt: Stammdaten, Vertriebspartner, CRM, Recherche und Sprachnotizen gehören zur Firma.
+- Jedes gekaufte Produkt hat ein eigenes Onboarding mit Fragenkatalog, Datenschutz, Unterschrift, PDF, Angebot und Zahlungen. Der KI-Telefon-Agent liegt wie bisher direkt in der Kundenakte, weitere Produkte unter `ob.<produkt-id>`; `prods` listet die Produkte des Kunden (fehlt bei älteren Akten = KI-Telefon-Agent). Keine Umstellung bestehender Daten nötig.
+- Neue Produkte legt ONLION unter „Produkte verwalten“ als Kopie an (Fragenkatalog, Rechtstexte, Preise). Status „Entwurf“ sieht nur ONLION, „Aktiv“ auch die Partner. Das Provisionsmodell gilt für alle Produkte. Zahlungen tragen das Produkt (`produkt`).
+
 ### Update: Firmenrecherche und Vorab-Broschüre (Oktober 2026)
 1. Auf platform.claude.com (Claude Console) ein Konto mit Zahlungsmethode anlegen, unter **API Keys** einen Schlüssel erzeugen und in Netlify als Secret `ANTHROPIC_API_KEY` eintragen (nur Production), danach **Trigger deploy**. Optional `ANTHROPIC_MODEL` (Standard: `claude-haiku-5-5`) und `RESEARCH_TIMEOUT_MS` (Standard 9000, gerechnet ab Start der Anfrage). Die Auswertung läuft in drei parallelen Teilen, damit jede Anfrage unter dem Netlify-Zeitlimit von 10 s bleibt. Meldet die App „hat zu lange gedauert“, hilft ein erneuter Versuch; bei Dauerproblemen in Netlify das Zeitlimit für Functions erhöhen (je nach Tarif).
 2. In der Console den Bedingungen zur Auftragsverarbeitung (DPA) zustimmen; die gelesenen Webseitentexte werden zur Auswertung an Anthropic übermittelt.

@@ -33,11 +33,16 @@ def page_for(ctx, team, seed, fnlog=None):
 def login(pg, mail):
     pg.fill('#lg-mail', mail); pg.fill('#lg-pw', 'richtig'); pg.click('#lg-btn'); pg.wait_for_selector('#login', state='hidden'); pg.wait_for_timeout(400)
 def prov(pg): return pg.evaluate("()=>[...__rows.values()].filter(r=>r.collection==='provisionen').map(r=>r.data)")
-def new_customer(pg, name, partner):
+def kunde(pg, name):
+    pg.click('#navKunden'); pg.click('.ctable tr.clk:has-text("%s")' % name); pg.wait_for_selector('h1:has-text("%s")' % name)
+def ob(pg, name, prod='KI-Telefon-Agent'):
+    kunde(pg, name); pg.click('.ptile-main:has-text("%s")' % prod); pg.wait_for_selector('.stages')
+def new_customer(pg, name, partner, staffel='1–49 Mitarbeitende'):
     pg.click('text=+ Neuer Kunde'); pg.fill('#nc-firma', name); pg.click('text=Anlegen'); pg.wait_for_selector('h1:has-text("%s")' % name)
     pg.select_option('#pay-partner', partner); pg.wait_for_timeout(300)
-    pg.click('nav >> text=Angebot'); pg.click('.chip:has-text("1–49 Mitarbeitende")'); pg.wait_for_timeout(400)
-    pg.click('button.mobile-back, nav >> text=Übersicht'); pg.wait_for_selector('#pay-amt')
+    pg.click('.ptile-main:has-text("KI-Telefon-Agent")'); pg.wait_for_selector('.stages')
+    pg.click('nav >> text=Angebot'); pg.click('.chip:has-text("%s")' % staffel); pg.wait_for_timeout(400)
+    pg.click('nav >> text=Übersicht'); pg.wait_for_selector('#pay-amt')
 try:
     with sync_playwright() as p:
         b = p.chromium.launch(args=['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'])
@@ -81,15 +86,16 @@ try:
         ok('Doppelte Einrichtung wird abgefangen', len([x for x in prov(a) if x['art'] == 'einrichtung' and x['kunde'] == 'Drei AG']) == 1)
         a.click('#navVertrieb'); a.click('.chip:has-text("Provisionsmodell")'); a.wait_for_selector('#md-l0')
         a.fill('#md-l0', '10'); a.wait_for_timeout(800); a.click('button:has-text("Freigeben …")'); a.click('button:has-text("Ja, freigeben")'); a.wait_for_timeout(500)
-        a.click('#custList .navbtn:has-text("Drei AG")'); a.wait_for_selector('#pay-amt')
+        ob(a, 'Drei AG'); a.wait_for_selector('#pay-amt')
         # Lizenz
-        a.click('#pay-partner'); a.click('.chip:has-text("Lizenz (Monat)")'); a.wait_for_timeout(200)
+        a.click('.chip:has-text("Lizenz (Monat)")'); a.wait_for_timeout(200)
         ok('Lizenzbetrag aus Staffel (450 €)', a.input_value('#pay-amt') == '450')
         a.click('button:has-text("Zahlungseingang verbuchen")'); a.wait_for_timeout(600)
         liz = {x['partner']: x for x in prov(a) if x['art'] == 'lizenz'}
         ok('Lizenz nach Konditionen der Einrichtung (15 %, nicht neue 10 %)', liz.get('p3@x.de', {}).get('satz') == 15)
         ok('Lizenz: p3 15 % = 67,50 €, p2 3 % = 13,50 €', liz.get('p3@x.de', {}).get('betrag') == 67.5 and liz.get('p2@x.de', {}).get('betrag') == 13.5 and liz['p3@x.de']['lizenzMonat'] == 1)
-        # Sprachnotiz
+        # Sprachnotiz (in der Kundenakte)
+        kunde(a, 'Drei AG')
         a.click('#rec-start'); a.wait_for_selector('#rec-stop'); a.wait_for_timeout(1800); a.click('#rec-stop')
         a.wait_for_selector('.logi:has-text("Testabschrift")', timeout=15000)
         a.wait_for_timeout(600)
@@ -105,6 +111,7 @@ try:
         ok('Löschen entfernt Audiodatei', a.evaluate("()=>Object.keys(window.__files||{}).length") == 0)
         a.screenshot(path=T + '/v-kunde.png', full_page=True)
         # Storno der Lizenz
+        ob(a, 'Drei AG')
         a.click('.member:has-text("Lizenz") >> button:has-text("Stornieren")'); a.click('.confirm >> button:has-text("Stornieren")'); a.wait_for_timeout(600)
         st = [x['status'] for x in prov(a) if x['art'] == 'lizenz']
         ok('Storno setzt Lizenz-Provisionen auf storniert', st and all(s == 'storniert' for s in st))
@@ -140,7 +147,7 @@ try:
         ok('Ausgezahlt markiert', all(x['status'] == 'ausgezahlt' for x in prov(a) if x['partner'] == 'p3@x.de' and x['status'] != 'storniert'))
         a.screenshot(path=T + '/v-abrechnung.png', full_page=True)
         # Storno nach Auszahlung: Rückbuchung
-        a.click('#custList .navbtn:has-text("Drei AG")'); a.wait_for_selector('#pay-amt')
+        ob(a, 'Drei AG'); a.wait_for_selector('#pay-amt')
         a.click('.member:has-text("Einrichtung") >> button:has-text("Stornieren")'); a.click('.confirm >> button:has-text("Stornieren")'); a.wait_for_timeout(600)
         neg = [x for x in prov(a) if x.get('storno')]
         ok('Storno nach Auszahlung bucht Rückforderung (%s)' % [x['betrag'] for x in neg], any(x['partner'] == 'p3@x.de' and x['betrag'] == -1250 for x in neg))
@@ -167,7 +174,8 @@ try:
         # Partner-Sicht
         pp = page_for(ctx, TEAM, rows); login(pp, 'p3@x.de')
         ok('Partner sieht „Provisionen“, keine Vorlagen', pp.inner_text('#navVertrieb') == 'Provisionen' and not pp.is_visible('#navTpl'))
-        ok('Partner sieht nur eigenen Kunden', 'Drei AG' in pp.inner_text('#custList') and 'Zwei GmbH' not in pp.inner_text('#custList'))
+        pp.click('#navKunden'); pp.wait_for_selector('h1:has-text("Alle Kunden")')
+        ok('Partner sieht nur eigenen Kunden', 'Drei AG' in pp.inner_text('#view') and 'Zwei GmbH' not in pp.inner_text('#view'))
         ok('Partner sieht keine Zahlungs-Karte, kein Löschen', pp.query_selector('#pay-amt') is None and pp.query_selector('button:has-text("Kundenakte löschen")') is None)
         pp.click('#navDash'); pp.wait_for_selector('.kpis')
         ok('Partner-Dashboard ohne Kostendeckung', 'Kostendeckung' not in pp.inner_text('#view'))
@@ -215,19 +223,13 @@ try:
         ok('3 Aktionen angelegt (Herbstaktion aus)', len(ak) == 3 and sum(1 for a in ak if a['aktiv']) == 2 and next(a for a in ak if a['typ']=='starthilfe')['prozent'] == 50)
         ok('Margen-Warnung über alle Aktionen', 'Mit allen eingeschalteten Aktionen' in i2.inner_text('#view'))
         i2.screenshot(path=T + '/v-aktionen.png', full_page=True)
-        i2.click('text=+ Neuer Kunde'); i2.fill('#nc-firma', 'Groß GmbH'); i2.click('text=Anlegen'); i2.wait_for_selector('h1:has-text("Groß GmbH")')
-        i2.select_option('#pay-partner', 'n@x.de'); i2.wait_for_timeout(300)
-        i2.click('nav >> text=Angebot'); i2.click('.chip:has-text("50–249 Mitarbeitende")'); i2.wait_for_timeout(400)
-        i2.click('nav >> text=Übersicht'); i2.wait_for_selector('#pay-amt')
+        new_customer(i2, 'Groß GmbH', 'n@x.de', '50–249 Mitarbeitende')
         i2.click('button:has-text("Zahlungseingang verbuchen")'); i2.wait_for_timeout(700)
         pv = [x for x in prov(i2) if x.get('kunde') == 'Groß GmbH' or x.get('von') == 'n@x.de']
         bys = sorted([(x['partner'], x['art'], x['betrag']) for x in pv])
         ok('Erster Kunde: Verkäufer 50 Prozent, Werber 50 Prozent Starthilfe, Bonus groß (' + str(bys) + ')', ('n@x.de', 'einrichtung', 2500) in bys and bys.count(('n@x.de', 'bonus', 250)) == 1 and ('s@x.de', 'einrichtung', 2500) in bys)
         # zweiter Kunde: keine Starthilfe mehr
-        i2.click('text=+ Neuer Kunde'); i2.fill('#nc-firma', 'Zweit KG'); i2.click('text=Anlegen'); i2.wait_for_selector('h1:has-text("Zweit KG")')
-        i2.select_option('#pay-partner', 'n@x.de'); i2.wait_for_timeout(300)
-        i2.click('nav >> text=Angebot'); i2.click('.chip:has-text("1–49 Mitarbeitende")'); i2.wait_for_timeout(400)
-        i2.click('nav >> text=Übersicht'); i2.wait_for_selector('#pay-amt')
+        new_customer(i2, 'Zweit KG', 'n@x.de')
         i2.click('button:has-text("Zahlungseingang verbuchen")'); i2.wait_for_timeout(700)
         s2 = [x for x in prov(i2) if x['partner'] == 's@x.de' and x['art'] == 'einrichtung' and x['basis'] == 2500]
         ok('Starthilfe nur beim ersten Kunden (%s)' % [x['satz'] for x in s2], len(s2) == 1 and s2[0]['satz'] == 10)
