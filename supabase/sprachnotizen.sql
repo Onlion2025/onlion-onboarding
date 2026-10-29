@@ -2,9 +2,9 @@
 -- In Supabase: SQL Editor → New query → alles einfügen → Run.
 
 -- 1) Privater Speicher (nicht öffentlich), max. 10 MB je Datei
-insert into storage.buckets (id, name, public, file_size_limit)
-values ('sprachnotizen', 'sprachnotizen', false, 10485760)
-on conflict (id) do update set public = false, file_size_limit = 10485760;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('sprachnotizen', 'sprachnotizen', false, 10485760, array['audio/webm','audio/mp4','audio/ogg','audio/mpeg','audio/aac','audio/x-m4a','audio/wav'])
+on conflict (id) do update set public = false, file_size_limit = 10485760, allowed_mime_types = excluded.allowed_mime_types;
 
 -- 2) Darf das angemeldete Konto auf diesen Kunden zugreifen?
 create or replace function public.can_access_customer(cid text)
@@ -24,8 +24,9 @@ create policy "Sprachnotizen lesen" on storage.objects for select to authenticat
   using (bucket_id = 'sprachnotizen' and public.can_access_customer((storage.foldername(name))[1]));
 create policy "Sprachnotizen hochladen" on storage.objects for insert to authenticated
   with check (bucket_id = 'sprachnotizen' and public.can_access_customer((storage.foldername(name))[1]));
+-- Löschen: ONLION alles, Partner nur selbst aufgenommene Notizen
 create policy "Sprachnotizen löschen" on storage.objects for delete to authenticated
-  using (bucket_id = 'sprachnotizen' and public.can_access_customer((storage.foldername(name))[1]));
+  using (bucket_id = 'sprachnotizen' and (public.is_admin() or (owner = auth.uid() and public.can_access_customer((storage.foldername(name))[1]))));
 
 -- Kontrolle: 3 Zeilen
 select policyname, cmd from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname like 'Sprachnotizen%';

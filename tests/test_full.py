@@ -46,7 +46,7 @@ try:
         page.click('text=+ Neuer Kunde'); page.fill('#nc-firma', 'Test GmbH'); page.click('text=Anlegen')
         page.wait_for_selector('h1:has-text("Test GmbH")')
         ok('Kunde angelegt', page.is_visible('h1:has-text("Test GmbH")'))
-        page.fill('#s-ap', 'Max Muster'); page.wait_for_timeout(700)
+        page.fill('#s-ap', 'Max Muster'); page.fill('#s-tel', '+49 911 123'); page.wait_for_timeout(700)
         page.screenshot(path=T + '/2-fahrplan.png')
         page.click('.stage:has-text("Fragenkatalog")')
         page.wait_for_selector('#q-q01')
@@ -56,7 +56,7 @@ try:
         ok('Schnelle Antworten alle gespeichert', cust['answers'].get('q01') == 'Verpasste Anrufe' and cust['answers'].get('q02') == 'Leads pro Monat' and cust['answers'].get('q03') == 'Zu viele Fehler')
         ok('Stammdaten gespeichert', cust.get('ansprechpartner') == 'Max Muster')
         page.screenshot(path=T + '/3-fragen.png')
-        ok('Fortschritt im Fragenkatalog (%s)' % page.inner_text('.prog-mini'), '14 %' in page.inner_text('.prog-mini'))
+        ok('Fortschritt im Fragenkatalog (%s)' % page.inner_text('.prog-mini'), '16 %' in page.inner_text('.prog-mini'))
         page.click('button:has-text("Weiter: Anrufe heute")')
         page.wait_for_selector('#q-q04')
         ok('Abschnitt-Wechsel', page.is_visible('#q-q04'))
@@ -64,7 +64,7 @@ try:
         page.fill('#q-q04', '.'); page.wait_for_timeout(300)
         ok('Punkt zeigt Hinweis', page.is_visible('#qh-q04'))
         page.click('body', position={'x': 5, 'y': 820}); page.wait_for_timeout(700)
-        ok('Punkt zählt nicht als Antwort', '14 %' in page.inner_text('.prog-mini'))
+        ok('Punkt zählt nicht als Antwort', '16 %' in page.inner_text('.prog-mini'))
         page.click('nav >> text=Unterschrift'); page.wait_for_selector('text=Unterschrift noch nicht möglich')
         ok('Unterschrift gesperrt, solange Fragen offen', 'Pflichtfrage' in page.inner_text('#view'))
         # Alle Abschnitte durchgehen: ★ beantworten, Rest „Entfällt“
@@ -109,14 +109,14 @@ try:
         ok('Einwilligung mit Text und Zeit gespeichert', (cust.get('leadConsent') or {}).get('given') is True and 'widerrufen' in cust['leadConsent']['text'])
         page.fill('#s-br', 'Immobilien') if page.is_visible('#s-br') and page.is_enabled('#s-br') else None
         # Leads exportieren
-        page.evaluate("()=>{const r=[...__rows.values()].find(r=>r.collection==='customers');r.data.branche='Immobilien';}")
+        page.evaluate("()=>{const r=[...__rows.values()].find(r=>r.collection==='customers');r.data.branche='Immobilien';r.data.telefon='+49 911 123';}")
         page.click('#navVertrieb'); page.click('.chip:has-text("Leads")'); page.wait_for_selector('#ld-k')
         ok('Lead-Liste zeigt Kunden mit Einwilligung', 'Test GmbH' in page.inner_text('#view'))
         page.click('button:has-text("Alle auswählen")'); page.fill('#ld-k', 'Telefonanlagen Müller'); page.fill('#ld-p', '40')
         with page.expect_download() as d:
             page.click('button:has-text("Exportieren (CSV) und protokollieren")')
         csvp = T + '/leads.csv'; d.value.save_as(csvp); csv = open(csvp, encoding='utf-8-sig').read()
-        ok('CSV mit Stammdaten, ohne Antworten', 'Test GmbH' in csv and 'Max Muster' in csv and 'Verpasste Anrufe' not in csv)
+        ok('CSV mit Stammdaten, ohne Antworten, Formeln entschärft', 'Test GmbH' in csv and 'Max Muster' in csv and 'Verpasste Anrufe' not in csv and "'+49 911 123" in csv)
         sales = page.evaluate("()=>[...__rows.values()].filter(r=>r.collection==='leadverkaeufe').map(r=>r.data)")
         ok('Weitergabe protokolliert', len(sales) == 1 and sales[0]['kaeufer'] == 'Telefonanlagen Müller' and sales[0]['summe'] == 40)
         page.screenshot(path=T + '/l-leads.png', full_page=True)

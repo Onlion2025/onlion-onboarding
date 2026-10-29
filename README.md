@@ -115,7 +115,7 @@ Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist.
 - **Fragenkatalog:** Punkt, „x“ und ähnliche Platzhalter zählen nicht als Antwort. ★-Fragen sind Pflicht, andere Fragen brauchen eine echte Antwort oder „Entfällt“ – sonst ist keine Unterschrift möglich.
 - **Sprachnotizen** im Bereich Vertrieb der Kundenakte: aufnehmen (max. 5 Minuten), Abschrift landet automatisch im Gesprächsprotokoll, Anhören und Löschen. Nur für eigene Notizen; Gespräche nicht ohne Zustimmung mitschneiden (§ 201 StGB).
 - **Leads:** freiwillige Einwilligung zur Weitergabe der Kontaktdaten bei der Unterschrift (oder nachträglich mit Nachweis), jederzeit widerrufbar. Unter Vertrieb → Leads nur Kunden mit Einwilligung exportieren; jede Weitergabe wird mit Käufer und Preis protokolliert. Anruferdaten und Fragenkatalog werden nie weitergegeben.
-- **Incentive-Aktionen** unter Vertrieb → Provisionsmodell: Prozent-Aufschlag, Bonus für große Kunden, Starthilfe für Werber (erster bezahlter Kunde eines neuen Partners). Mit Zeitraum, jederzeit ein- und ausschaltbar; Partner sehen laufende Aktionen.
+- **Incentive-Aktionen** unter Vertrieb → Provisionsmodell: Prozent-Aufschlag, Bonus für große Kunden, Starthilfe für Werber (erster bezahlter Kunde eines neuen Partners, aus dem ONLION-Anteil, Ebene 2 entfällt dabei). Mit Zeitraum, jederzeit ein- und ausschaltbar; Partner sehen laufende Aktionen.
 - **Konto & Team:** eigenes Passwort ändern (mit aktuellem Passwort bestätigt). Als Inhaber Personen per E-Mail einladen, den Link erneut senden oder den Zugang entfernen. Eingeladene legen ihr Passwort über den Link selbst fest und sehen alle Kunden.
 - **Passwort vergessen?** auf der Anmeldeseite schickt einen Link zum Neusetzen, aber nur an Adressen aus dem Team.
 

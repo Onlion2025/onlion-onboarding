@@ -35,6 +35,7 @@ exports.handler = async (event) => {
   form.append('file', new Blob([buf], { type }), path.split('/').pop());
   const r = await fetch('https://api.elevenlabs.io/v1/speech-to-text', { method: 'POST', headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }, body: form });
   const t = await r.json().catch(() => ({}));
-  if (!r.ok) return json(502, { error: 'Abschrift fehlgeschlagen: ' + ((t.detail && (t.detail.message || t.detail)) || t.message || r.status) });
+  const det = t.detail && (typeof t.detail === 'string' ? t.detail : (t.detail.message || t.detail.status || ''));
+  if (!r.ok) return json(502, { error: 'Abschrift fehlgeschlagen: ' + (det || t.message || ('Status ' + r.status)) });
   return json(200, { text: String(t.text || '').trim() });
 };

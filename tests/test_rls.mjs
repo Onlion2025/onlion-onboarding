@@ -11,8 +11,9 @@ alter table public.docs enable row level security;
 grant select, insert, update, delete on public.docs to authenticated;`);
 await ex(fs.readFileSync(R + 'team.sql', 'utf8'));
 await ex(`create schema storage;
-create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint);
-create table storage.objects (bucket_id text, name text, primary key (bucket_id, name));
+create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
+create table storage.objects (bucket_id text, name text, owner uuid, primary key (bucket_id, name));
+create function auth.uid() returns uuid language sql stable as $u$ select nullif(auth.jwt() ->> 'sub','')::uuid $u$; grant execute on function auth.uid() to authenticated;
 alter table storage.objects enable row level security;
 create function storage.foldername(name text) returns text[] language sql immutable as $f$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'),1)-1] $f$;
 grant usage on schema storage to authenticated; grant select, insert, delete on storage.objects to authenticated; grant execute on function storage.foldername(text) to authenticated;`);
@@ -30,7 +31,8 @@ insert into docs values ('customers','a','{"firma":"A","partner":"p1@x.de"}'),('
 let pass = 0, fail = 0;
 const ok = (n, c) => { console.log((c ? 'OK   ' : 'FAIL ') + n); c ? pass++ : fail++; };
 async function as(email, fn) {
-  await ex(`reset role; select set_config('request.jwt.claims', '${JSON.stringify({ email })}', false); set role authenticated;`);
+  const sub = email === 'p1@x.de' ? '00000000-0000-0000-0000-000000000011' : '00000000-0000-0000-0000-0000000000aa';
+  await ex(`reset role; select set_config('request.jwt.claims', '${JSON.stringify({ email, sub })}', false); set role authenticated;`);
   try { return await fn(); } finally { await ex('reset role'); }
 }
 const q = async s => (await db.query(s)).rows;
@@ -86,11 +88,13 @@ await as('fremd@x.de', async () => {
 });
 ok('Werber mit Struktur nicht löschbar', !(await tryq(`delete from team where email='p2@x.de'`)));
 // Sprachnotizen-Speicher
-await ex(`insert into storage.objects values ('sprachnotizen','a/n1.webm'),('sprachnotizen','b/n2.webm'),('sprachnotizen','c/n3.webm')`);
+await ex(`insert into storage.objects values ('sprachnotizen','a/n1.webm','00000000-0000-0000-0000-0000000000aa'),('sprachnotizen','b/n2.webm',null),('sprachnotizen','c/n3.webm',null),('sprachnotizen','a/eigen.webm','00000000-0000-0000-0000-0000000000p1')`.replace('0000000000p1','000000000011'));
 await as('p1@x.de', async () => {
   const o = await q(`select name from storage.objects`);
-  ok('Partner sieht nur Notizen eigener Kunden', o.length === 1 && o[0].name === 'a/n1.webm');
-  ok('Partner kann bei eigenem Kunden hochladen', await tryq(`insert into storage.objects values ('sprachnotizen','a/n4.webm')`));
+  ok('Partner sieht nur Notizen eigener Kunden', o.length === 2 && o.every(x => x.name.startsWith('a/')));
+  ok('Partner kann bei eigenem Kunden hochladen', await tryq(`insert into storage.objects values ('sprachnotizen','a/n4.webm','00000000-0000-0000-0000-000000000011')`));
+  ok('Partner löscht eigene Notiz', (await q(`delete from storage.objects where name='a/eigen.webm' returning name`)).length === 1);
+  ok('Partner löscht keine ONLION-Notiz', (await q(`delete from storage.objects where name='a/n1.webm' returning name`)).length === 0);
   ok('Partner kann nicht bei fremdem Kunden hochladen', !(await tryq(`insert into storage.objects values ('sprachnotizen','b/n5.webm')`)));
   ok('Partner kann fremde Notiz nicht löschen', (await q(`delete from storage.objects where name='b/n2.webm' returning name`)).length === 0);
 });

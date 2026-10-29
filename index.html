@@ -299,9 +299,17 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 function cur(){return S.customers.find(c=>c.id===S.curId)||null;}
 function allQs(){return S.tpl?S.tpl.sections.flatMap(s=>s.questions):[];}
 /* Echte Antwort: mind. 3 Zeichen, kein Platzhalter wie „.“, „x“, „-“, „???“, „aaa“ */
-const LEAD_TEXT='Ich bin einverstanden, dass ONLION die Kontaktdaten meines Unternehmens (Firma, Branche, Anschrift, Ansprechpartner, E-Mail, Telefon) an ausgewählte Geschäftspartner weitergibt, die mir passende Angebote für mein Unternehmen machen dürfen – auch per E-Mail und Telefon. Die Einwilligung ist freiwillig und unabhängig vom Vertrag über den KI-Telefon-Agenten. Ich kann sie jederzeit ohne Angabe von Gründen gegenüber ONLION widerrufen; die Weitergabe endet dann für die Zukunft.';
+const LEAD_TEXT_DEFAULT='Ich bin einverstanden, dass ONLION die Kontaktdaten meines Unternehmens (Firma, Branche, Anschrift, Ansprechpartner, E-Mail, Telefon) an Unternehmen aus den Bereichen Telekommunikation, IT und Software, Marketing sowie Unternehmensberatung weitergibt, die mir Angebote für mein Unternehmen per E-Mail und Telefon machen dürfen. Die aktuelle Liste der Empfänger stellt ONLION auf Anfrage zur Verfügung. Die Einwilligung ist freiwillig und unabhängig vom Vertrag über den KI-Telefon-Agenten. Ich kann sie jederzeit ohne Angabe von Gründen gegenüber ONLION widerrufen; die Weitergabe endet dann für die Zukunft.';
+function leadText(){return (S.cfg&&S.cfg.leadText)||LEAD_TEXT_DEFAULT;}
 function leadOk(c){const l=c&&c.leadConsent;return !!(l&&l.given&&!l.widerrufenAm);}
-function realAnswer(v){const s=String(v||'').trim();if(s.length<3)return false;if(/^[\s.,;:!?\-_xX0\/\\*+#~|]+$/.test(s))return false;const t=s.replace(/\s/g,'').toLowerCase();if(/^(.)\1+$/.test(t))return false;if(/^(n\/?a|test|asdf|qwer|xyz|abc|bla|blabla|egal|keine?|nix|nichts)$/.test(t))return false;return true;}
+function realAnswer(v){const s=String(v||'').trim();if(!s)return false;
+  if(/^\d+([.,]\d+)?\s*[%€a-zA-ZäöüÄÖÜ.\/-]{0,12}$/.test(s))return true;                 // Zahlen: „5“, „50“, „100 %“, „3 Std.“
+  if(/^(ja|nein|jo|nö|ok|okay)\.?!?$/i.test(s))return true;                                 // kurze Ja/Nein-Antworten
+  if(/^[\s.,;:!?\-_xX\/\\*+#~|]+$/.test(s))return false;                                   // nur Platzhalterzeichen
+  const t=s.replace(/\s/g,'').toLowerCase();
+  if(/^([.\-_x?*])\1*$/.test(t))return false;
+  if(/^(n\/?a|test|asdf|qwer|xyz|bla|blabla)$/.test(t))return false;
+  return /[a-zA-ZäöüÄÖÜß]/.test(s)&&s.length>=2;}
 function isNA(c,q){return !q.star&&!!(c.na&&c.na[q.id]);}
 function answered(c,q){return realAnswer((c.answers||{})[q.id])||isNA(c,q);}
 function answeredCount(c){return allQs().filter(q=>answered(c,q)).length;}
@@ -462,7 +470,7 @@ function viewStart(c){
   const stamm=h('section',{class:'card','aria-label':'Stammdaten'},h('h2',null,'Stammdaten'),
     h('div',{class:'grid2'},f('s-firma','Firma','firma'),f('s-ap','Ansprechpartner','ansprechpartner'),f('s-mail','E-Mail','email','email'),f('s-tel','Telefon','telefon','tel'),f('s-adr','Adresse','adresse'),f('s-br','Branche','branche')));
   const del=S.confirm==='del'+c.id
-    ?h('div',{class:'confirm'},'Kundenakte „'+(c.firma||'')+'“ endgültig löschen?',h('button',{type:'button',class:'btn danger',onclick:async()=>{await S.db.doc('customers/'+c.id).delete();S.curId=null;S.confirm=null;S.view='start';toast('Kundenakte gelöscht');render();}},'Ja, löschen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
+    ?h('div',{class:'confirm'},'Kundenakte „'+(c.firma||'')+'“ endgültig löschen?',h('button',{type:'button',class:'btn danger',onclick:async()=>{try{const {data:fl}=await S.sb.storage.from('sprachnotizen').list(c.id);if(fl&&fl.length)await S.sb.storage.from('sprachnotizen').remove(fl.map(f=>c.id+'/'+f.name));}catch(x){}await S.db.doc('customers/'+c.id).delete();S.curId=null;S.confirm=null;S.view='start';toast('Kundenakte gelöscht');render();}},'Ja, löschen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
     :h('button',{type:'button',class:'btn danger',onclick:()=>{S.confirm='del'+c.id;render();}},'Kundenakte löschen');
   const next=STAGES.find(st=>stageState(c,st.id)!=='done'&&stageState(c,st.id)!=='locked');
   return [
@@ -481,7 +489,7 @@ function viewFragen(c){
     const num=allQs().indexOf(q)+1;
     return h('div',{class:'q'+(q.star?' star':'')},
       h('label',{for:'q-'+q.id},num+' · '+q.text+' ',q.star?h('span',{class:'star-mark','aria-label':'im Termin klären'},'★'):null),
-      (()=>{const hint=h('div',{class:'eyebrow late',id:'qh-'+q.id,hidden:!(a[q.id]&&!realAnswer(a[q.id]))},'Bitte eine echte Antwort eintragen (mindestens 3 Zeichen, kein Platzhalter).');
+      (()=>{const hint=h('div',{class:'eyebrow late',id:'qh-'+q.id,hidden:!(a[q.id]&&!realAnswer(a[q.id]))},'Bitte eine echte Antwort eintragen – ein Punkt, „x“ oder „-“ zählt nicht.');
         const na=isNA(c,q);
         return [h('textarea',{id:'q-'+q.id,disabled:ro||na,value:na?'':(a[q.id]||''),placeholder:na?'Entfällt':'',oninput:e=>{const p={answers:{}};p.answers[q.id]=e.target.value;saveCust(c.id,p);hint.hidden=!(e.target.value.trim()&&!realAnswer(e.target.value));}}),hint,
           q.star?null:h('label',{class:'check',style:'min-height:36px;padding-block:2px;font-size:14px'},h('input',{type:'checkbox',id:'qna-'+q.id,disabled:ro,checked:na,onchange:e=>{const p={na:{}};p.na[q.id]=e.target.checked;saveCust(c.id,p,0);render._force=true;render();}}),'Entfällt für diesen Kunden')];})());
@@ -559,7 +567,7 @@ function consentCard(c){
   else body.push(h('div',{class:'eyebrow'},'Nicht erteilt. Kontaktdaten werden nicht weitergegeben.'));
   if(ok)body.push(S.confirm==='wid'+c.id?h('div',{class:'confirm'},'Widerruf erfassen? Der Kunde erscheint dann nicht mehr bei den Leads.',h('button',{type:'button',class:'btn danger',onclick:()=>{saveCust(c.id,{leadConsent:{widerrufenAm:new Date().toISOString(),widerrufBy:(S.me&&S.me.email)||''}},0);S.confirm=null;toast('Widerruf erfasst');render._force=true;render();}},'Widerruf erfassen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
     :h('button',{type:'button',class:'btn',style:'align-self:flex-start',onclick:()=>{S.confirm='wid'+c.id;render();}},'Widerruf erfassen'));
-  else if(isAdmin())body.push(S.confirm==='nach'+c.id?h('form',{class:'grid2',style:'align-items:end',onsubmit:e=>{e.preventDefault();const n=document.getElementById('lc-nw').value.trim(),nm=document.getElementById('lc-nm').value.trim();if(n.length<5||!nm){toast('Bitte Name und Nachweis eintragen.');return;}saveCust(c.id,{leadConsent:{given:true,at:new Date().toISOString(),text:LEAD_TEXT,name:nm,by:(S.me&&S.me.email)||'',quelle:'Nachweis: '+n,widerrufenAm:null}},0);S.confirm=null;toast('Einwilligung erfasst');render._force=true;render();}},
+  else if(isAdmin())body.push(S.confirm==='nach'+c.id?h('form',{class:'grid2',style:'align-items:end',onsubmit:e=>{e.preventDefault();const n=document.getElementById('lc-nw').value.trim(),nm=document.getElementById('lc-nm').value.trim();if(n.length<5||!nm){toast('Bitte Name und Nachweis eintragen.');return;}saveCust(c.id,{leadConsent:{given:true,at:new Date().toISOString(),text:leadText(),name:nm,by:(S.me&&S.me.email)||'',quelle:'Nachweis: '+n,widerrufenAm:null}},0);S.confirm=null;toast('Einwilligung erfasst');render._force=true;render();}},
       h('div',{class:'field'},h('label',{for:'lc-nm'},'Name des Einwilligenden'),h('input',{type:'text',id:'lc-nm',value:c.ansprechpartner||''})),h('div',{class:'field'},h('label',{for:'lc-nw'},'Nachweis (z. B. „unterschriebenes Formular vom 03.11.2026“)'),h('input',{type:'text',id:'lc-nw'})),h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Speichern'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen')))
     :h('button',{type:'button',class:'btn',style:'align-self:flex-start',onclick:()=>{S.confirm='nach'+c.id;render();}},'Schriftliche Einwilligung nachträglich erfassen'));
   return h('div',{class:'card'},...body);
@@ -596,7 +604,7 @@ function viewUnterschrift(c){
     const signedAt=new Date().toISOString();
     const hash=await sha256(canonical(fresh,{signedAt,ort,kunde:name}));
     const up={signature:{kunde,onlion,ort,signedAt,hash,version:(c.history||[]).length+1}};
-    const lo=document.getElementById('lead-ok');if(lo&&lo.checked)up.leadConsent={given:true,at:signedAt,text:LEAD_TEXT,name,by:(S.me&&S.me.email)||'',quelle:'Unterschrift',widerrufenAm:null};const cs=crmOf(fresh).status||'neu';if(cs!=='verloren'&&(CRM_RANK[cs]||0)<CRM_RANK.unterschrieben)Object.assign(up,crmPatch(fresh,'unterschrieben'));
+    const lo=document.getElementById('lead-ok');if(lo&&lo.checked)up.leadConsent={given:true,at:signedAt,text:leadText(),name,by:(S.me&&S.me.email)||'',quelle:'Unterschrift',widerrufenAm:null};const cs=crmOf(fresh).status||'neu';if(cs!=='verloren'&&(CRM_RANK[cs]||0)<CRM_RANK.unterschrieben)Object.assign(up,crmPatch(fresh,'unterschrieben'));
     try{await S.db.doc('customers/'+c.id).update(up);toast('Unterschrieben');}
     catch(err){toast('Nicht gespeichert: '+(err&&err.message||err));e.target.disabled=false;}
   }},'Verbindlich unterschreiben');
@@ -611,7 +619,7 @@ function viewUnterschrift(c){
       h('div',{class:'card'},h('div',{class:'label'},'Unterschrift Kunde'),makePad('kunde')),
       h('div',{class:'card'},h('div',{class:'label'},'Unterschrift ONLION'),makePad('onlion'))),
     h('div',{class:'card'},h('div',{class:'label'},'Freiwillige Einwilligung (optional, unabhängig vom Vertrag)'),
-      h('label',{class:'check'},h('input',{type:'checkbox',id:'lead-ok'}),h('span',null,LEAD_TEXT))),
+      h('label',{class:'check'},h('input',{type:'checkbox',id:'lead-ok'}),h('span',null,leadText()))),
     h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>{S.view='datenschutz';render();}},'Zurück'),h('div',{class:'spacer'}),signBtn)];
 }
 
@@ -729,7 +737,7 @@ async function buildPdf(c){
     lines(wrap(T(sg.ort)+', '+fmtDate(sg.signedAt),9.5,'normal'),9.5,'normal',INK,M,2);
     lines(wrap('Prüfsumme SHA-256: '+sg.hash,7,'normal'),7,'normal',MUT,M,1);
     lines(wrap('Die Prüfsumme belegt, dass der Inhalt seit der Unterschrift nicht verändert wurde.',7,'normal'),7,'normal',MUT,M,1);
-    if(leadOk(c)){y+=3;lines(wrap('Freiwillige Einwilligung Weitergabe Kontaktdaten (erteilt am '+fmtDate(c.leadConsent.at)+'):',8,'bold'),8,'bold',INK,M,1);lines(wrap(c.leadConsent.text||LEAD_TEXT,7.5,'normal'),7.5,'normal',MUT,M,1);}
+    if(leadOk(c)){y+=3;lines(wrap('Freiwillige Einwilligung Weitergabe Kontaktdaten (erteilt am '+fmtDate(c.leadConsent.at)+'):',8,'bold'),8,'bold',INK,M,1);lines(wrap(c.leadConsent.text||leadText(),7.5,'normal'),7.5,'normal',MUT,M,1);}
   } else lines(wrap('Noch nicht unterschrieben.',10,'italic'),10,'italic',MUT,M,2);
 
   const pages=doc.getNumberOfPages();
@@ -857,7 +865,7 @@ function viewVorlagen(){
 
 /* ---------- CRM ---------- */
 /* ---------- Sprachnotizen ---------- */
-const REC_MAX=300;
+const REC_MAX=180;
 function recSupported(){return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);}
 async function recStart(c){
   if(!recSupported()){toast('Aufnahme wird von diesem Browser nicht unterstützt.');return;}
@@ -902,7 +910,7 @@ function recControls(c){
   return h('div',{class:'field'},
     h('div',{class:'row',style:'gap:10px'},
       rec?h('button',{type:'button',class:'btn danger',id:'rec-stop',onclick:recStop},'■ Aufnahme beenden'):h('button',{type:'button',class:'btn',id:'rec-start',disabled:busy||!!S.rec,onclick:()=>recStart(c)},busy?'Sprachnotiz wird verarbeitet …':'🎙 Sprachnotiz aufnehmen'),
-      rec?h('span',{class:'tabnum',style:'font-weight:700;color:#b42318'},'● ',h('span',{id:'rec-time'},'0:00'),' / 5:00'):null),
+      rec?h('span',{class:'tabnum',style:'font-weight:700;color:#b42318'},'● ',h('span',{id:'rec-time'},'0:00'),' / 3:00'):null),
     h('div',{class:'eyebrow'},'Für eigene Notizen nach dem Gespräch. Gespräche nicht ohne Zustimmung aller Beteiligten mitschneiden (§ 201 StGB). Die Abschrift erstellt ElevenLabs.'));
 }
 function crmCard(c){
@@ -1065,7 +1073,7 @@ const r2=x=>Math.round((Number(x)||0)*100)/100;
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
 function isAdmin(){return !S.me||S.me.role!=='partner';}
 function isOwner(){return !!(S.me&&S.me.role==='owner');}
-function cfg(){const c=S.cfg||{};return {aktionen:Array.isArray(c.aktionen)?c.aktionen:[],versions:(c.versions&&c.versions.length)?c.versions:DEFAULT_CFG.versions,draft:c.draft||null,staffeln:(c.staffeln&&c.staffeln.length)?c.staffeln:DEFAULT_CFG.staffeln,absender:Object.assign({},DEFAULT_CFG.absender,c.absender||{}),kosten:Object.assign({},DEFAULT_CFG.kosten,S.kosten||{})};}
+function cfg(){const c=S.cfg||{};return {leadText:c.leadText||undefined,aktionen:Array.isArray(c.aktionen)?c.aktionen:[],versions:(c.versions&&c.versions.length)?c.versions:DEFAULT_CFG.versions,draft:c.draft||null,staffeln:(c.staffeln&&c.staffeln.length)?c.staffeln:DEFAULT_CFG.staffeln,absender:Object.assign({},DEFAULT_CFG.absender,c.absender||{}),kosten:Object.assign({},DEFAULT_CFG.kosten,S.kosten||{})};}
 function saveCfg(patch){const c=Object.assign({},cfg(),patch);delete c.kosten;S.cfg=c;return S.db.doc('config/provision').set(c);}
 /* Kostenmodell liegt getrennt in intern/kosten: nur ONLION darf es lesen (Partner haben auf „intern“ keinen Zugriff) */
 function saveKosten(k){S.kosten=Object.assign({},k);return S.db.doc('intern/kosten').set(S.kosten);}
@@ -1099,8 +1107,10 @@ function computeRows(z,batch){
   else if(z.sonder!==undefined)sonder=z.sonder;
   const R=v.rates||{};const zahlPool=S.zahl.concat(batch||[]);
   const akts=z.art==='einrichtung'?aktionenAt(z.datum):[];
-  const firstSale=!zahlPool.some(x=>x.id!==z.id&&x.partner===seller&&x.art==='einrichtung'&&!x.storniert&&x.netto>0&&String(x.datum)<=String(z.datum));
-  const sh=firstSale?akts.find(a=>a.typ==='starthilfe'):null;
+  const firstSale=!zahlPool.some(x=>x.id!==z.id&&x.partner===seller&&x.art==='einrichtung'&&!x.storniert&&x.netto>0)&&!liveProv().some(r=>r.von===seller&&r.ebene===1&&r.aktion&&(cfg().aktionen.find(a=>a.id===r.aktion)||{}).typ==='starthilfe');
+  const stp=tm(seller)||{};const joined=String(stp.vertrag_am||stp.added_at||'').slice(0,10);
+  const isNew=!joined||(new Date(z.datum+'T12:00')-new Date(joined+'T12:00'))/864e5<=183;
+  const sh=firstSale&&isNew?akts.find(a=>a.typ==='starthilfe'):null;
   chain.forEach((p,i)=>{
     const t=tm(p);if(!t||t.role!=='partner'||t.status==='inaktiv')return;
     let e=Number((R.einrichtung||[])[i])||0,l=Number((R.lizenz||[])[i])||0,lm=Number((R.lizenzMonate||[])[i])||0;
@@ -1108,6 +1118,7 @@ function computeRows(z,batch){
     const q=Number(R.aktivQuartale)||0;
     if(i>0&&q>0){const from=quarterWindowStart(z.datum,q);const active=zahlPool.some(x=>x.partner===p&&x.art==='einrichtung'&&!x.storniert&&x.netto>0&&x.datum>=from&&x.datum<=z.datum);if(!active)return;}
     if(i===1&&sh)e=Number(sh.prozent)||0;
+    if(i===2&&sh&&z.art==='einrichtung')return; // Starthilfe kommt aus dem ONLION-Anteil, Ebene 2 entfällt bei diesem Abschluss
     const satz=z.art==='einrichtung'?e:(idx>=1&&idx<=lm?l:0);
     if(!(satz>0))return;
     out.push({id:uid(),partner:p,ebene:i,art:z.art,zahlungId:z.id,customerId:i===0?z.customerId:'',kunde:i===0?(z.firma||''):'',von:i>0?seller:'',basis:r2(z.netto),satz,betrag:r2(z.netto*satz/100),datum:z.datum,monat:z.monat||'',lizenzMonat:z.art==='lizenz'?idx:null,version:v.id,status:'faellig',gutschriftId:null,at:new Date().toISOString()});
@@ -1178,7 +1189,7 @@ async function markPaid(g){
 const AKT_TYP={prozent:'Prozent-Aufschlag auf die Einrichtung',gross:'Bonus für große Kunden',starthilfe:'Starthilfe für Werber'};
 function aktOn(a,d){return !!(a&&a.aktiv&&(!a.von||String(d)>=a.von)&&(!a.bis||String(d)<=a.bis));}
 function aktionenAt(d){return cfg().aktionen.filter(a=>aktOn(a,d));}
-function aktText(a){return a.typ==='prozent'?'+'+pct(a.prozent)+' auf die Einrichtung für den Verkäufer':a.typ==='gross'?eur(a.betrag)+' Bonus je bezahlter Einrichtung bei: '+(a.staffeln||[]).map(id=>(cfg().staffeln.find(x=>x.id===id)||{}).label||id).join(', '):'Werber erhält '+pct(a.prozent)+' der Einrichtung beim ersten bezahlten Kunden seines neuen Partners (statt Ebene-1-Satz)';}
+function aktText(a){return a.typ==='prozent'?'+'+pct(a.prozent)+' auf die Einrichtung für den Verkäufer':a.typ==='gross'?eur(a.betrag)+' Bonus je bezahlter Einrichtung bei: '+(a.staffeln||[]).map(id=>(cfg().staffeln.find(x=>x.id===id)||{}).label||id).join(', '):'Werber erhält '+pct(a.prozent)+' der Einrichtung beim ersten bezahlten Kunden seines neuen Partners (statt Ebene-1-Satz; Ebene 2 entfällt bei diesem Abschluss)';}
 function provText(r){
   if(r.art==='bonus')return (r.storno?'Storno: ':'')+'Aktion „'+(r.aktionName||'Bonus')+'“ · '+(r.kunde||'Kunde');
   const art=r.art==='einrichtung'?'Einrichtung':'Lizenz '+(r.monat?fmtMonth(r.monat):'')+(r.lizenzMonat?' (Monat '+r.lizenzMonat+')':'');
@@ -1447,13 +1458,16 @@ function vtModell(){
   // Incentive-Aktionen
   {
     const list=c.aktionen.slice();const R0=(versionAt(todayStr()).rates||{});
+    const E=i=>Number((R0.einrichtung||[])[i])||0;const small=(c.staffeln[0]||{einrichtung:2500}).einrichtung||2500;
+    const shareOf=arr=>{let sh=arr.find(a=>a.typ==='starthilfe');let p=E(0)+(sh?Math.max(E(1),Number(sh.prozent)||0):E(1)+E(2));for(const a of arr){if(a.typ==='prozent')p+=Number(a.prozent)||0;}return r2(p);};
+    const activeNow=list.filter(a=>a.aktiv);const totalShare=shareOf(activeNow);
     const box=h('div',{class:'dlist'});
     if(!list.length)box.append(h('div',{class:'eyebrow'},'Noch keine Aktionen angelegt.'));
     for(const a of list){
       const on=aktOn(a,todayStr());
       const share=a.typ==='starthilfe'?(Number((R0.einrichtung||[])[0])||0)+(Number(a.prozent)||0)+(Number((R0.einrichtung||[])[2])||0):a.typ==='prozent'?(Number((R0.einrichtung||[])[0])||0)+(Number((R0.einrichtung||[])[1])||0)+(Number((R0.einrichtung||[])[2])||0)+(Number(a.prozent)||0):null;
       box.append(h('div',{class:'member'},
-        h('label',{class:'check',style:'min-height:36px;padding:0'},h('input',{type:'checkbox',checked:!!a.aktiv,'aria-label':'Aktion aktiv',onchange:async e=>{const n=c.aktionen.map(x=>x.id===a.id?Object.assign({},x,{aktiv:e.target.checked}):x);await saveCfg({aktionen:n});toast(e.target.checked?'Aktion eingeschaltet':'Aktion ausgeschaltet');render._force=true;render();}})),
+        h('label',{class:'check',style:'min-height:36px;padding:0'},h('input',{type:'checkbox',checked:!!a.aktiv,'aria-label':'Aktion aktiv',onchange:async e=>{const n=c.aktionen.map(x=>x.id===a.id?Object.assign({},x,{aktiv:e.target.checked}):x);if(e.target.checked&&shareOf(n.filter(x=>x.aktiv))>100){e.target.checked=false;toast('Zusammen gingen über 100 % der Einrichtung an Partner. Erst eine andere Aktion ausschalten.');return;}await saveCfg({aktionen:n});toast(e.target.checked?'Aktion eingeschaltet':'Aktion ausgeschaltet');render._force=true;render();}})),
         h('div',{class:'who'},h('strong',null,a.name||AKT_TYP[a.typ]),h('span',{class:'tag'+(on?' lime':'')},on?'läuft':a.aktiv?'geplant/abgelaufen':'aus'),
           h('div',{class:'eyebrow'},aktText(a)+' · '+(a.von?fmtDay(a.von).replace(/^\w+\.,\s*/,''):'sofort')+' bis '+(a.bis?fmtDay(a.bis).replace(/^\w+\.,\s*/,''):'auf Weiteres')),
           share!=null&&share>=80?h('div',{class:'eyebrow late'},'Bis zu '+pct(share)+' der Einrichtung gehen an Partner. Deine Marge an der Einrichtung: '+eur(r2((cfg().staffeln[0]||{einrichtung:2500}).einrichtung*(100-share)/100-setupCost()))+' (kleinste Staffel, nach Einrichtungszeit).'):null),
@@ -1465,7 +1479,8 @@ function vtModell(){
     const typSel=h('select',{id:'ak-typ',onchange:e=>{nf.typ=e.target.value;render._force=true;render();}},...Object.entries(AKT_TYP).map(([k,t])=>{const o=h('option',{value:k},t);if(nf.typ===k)o.selected=true;return o;}));
     const stBox=nf.typ==='gross'?h('div',{class:'field'},h('label',null,'Gilt für Staffeln'),h('div',{class:'chips'},...c.staffeln.slice(1).map(x=>h('label',{class:'chip',style:'display:inline-flex;align-items:center;gap:6px'},h('input',{type:'checkbox',class:'ak-st',value:x.id,checked:true}),x.label)))):null;
     out.push(h('section',{class:'card'},h('h2',null,'Incentive-Aktionen'),
-      h('p',{class:'eyebrow',style:'margin:0'},'Zeitlich begrenzte Zusatzprovisionen, jederzeit ein- und ausschaltbar. Sie gelten nur für bezahlte Einrichtungen im Aktionszeitraum – nie für das Anwerben selbst. Die Starthilfe erhält der Werber nur, wenn er die Aktivitätsbedingung erfüllt.'),
+      totalShare>=80?h('div',{class:'banner warn'},'Mit allen eingeschalteten Aktionen gehen bis zu '+pct(totalShare)+' der Einrichtung an Partner (dazu ggf. Festbeträge). Deine Marge an der Einrichtung der kleinsten Staffel: '+eur(r2(small*(100-totalShare)/100-setupCost()))+' nach Einrichtungszeit.'):null,
+      h('p',{class:'eyebrow',style:'margin:0'},'Zeitlich begrenzte Zusatzprovisionen, jederzeit ein- und ausschaltbar. Sie gelten nur für bezahlte Einrichtungen im Aktionszeitraum – nie für das Anwerben selbst. Die Starthilfe erhält der Werber nur beim ersten bezahlten Kunden eines neuen Partners (höchstens 6 Monate nach Vertragsbeginn) und nur, wenn er die Aktivitätsbedingung erfüllt; sie kommt aus dem ONLION-Anteil, Ebene 2 erhält bei diesem Abschluss nichts.'),
       box,
       h('form',{class:'card',style:'background:var(--panel2)',onsubmit:async e=>{
         e.preventDefault();const g=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
@@ -1474,6 +1489,7 @@ function vtModell(){
         else a.prozent=Math.max(0,Math.min(100,parseFloat(g('ak-wert'))||0));
         if(!(a.betrag>0||a.prozent>0)){toast('Bitte einen Wert eintragen.');return;}
         if(a.bis&&a.bis<a.von){toast('Das Enddatum liegt vor dem Start.');return;}
+        if(shareOf(activeNow.concat([a]))>100){toast('Zusammen mit den laufenden Aktionen gingen über 100 % der Einrichtung an Partner. Bitte Wert senken.');return;}
         await saveCfg({aktionen:c.aktionen.concat([a])});S.aktNew=null;toast('Aktion angelegt und eingeschaltet');render._force=true;render();
       }},h('h2',{style:'font-size:16px'},'Neue Aktion'),
         h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'ak-typ'},'Art'),typSel),inp('ak-name','Name (für Partner sichtbar)',{type:'text',placeholder:AKT_TYP[nf.typ]}),
@@ -1492,7 +1508,7 @@ function vtModell(){
   out.push(h('section',{class:'card'},h('h2',null,'Absender auf Gutschriften'),h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'ab-n'},'Name'),h('input',{type:'text',id:'ab-n',value:ab.name||'',oninput:e=>ab.name=e.target.value})),h('div',{class:'field'},h('label',{for:'ab-s'},'Steuer-Nr. / USt-ID'),h('input',{type:'text',id:'ab-s',value:ab.steuer||'',oninput:e=>ab.steuer=e.target.value}))),h('div',{class:'field'},h('label',{for:'ab-a'},'Anschrift'),h('input',{type:'text',id:'ab-a',value:ab.adresse||'',oninput:e=>ab.adresse=e.target.value})),h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async()=>{await saveCfg({absender:ab});toast('Absender gespeichert');}},'Speichern'))));
   return out;
 }
-function csvCell(v){const s=String(v==null?'':v).replace(/\r?\n/g,' ');return /[";,]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function csvCell(v){let s=String(v==null?'':v).replace(/\r?\n/g,' ');if(/^[=+\-@\t\r]/.test(s))s="'"+s;return /[";,]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
 function vtLeads(){
   const out=[];const all=S.customers.filter(leadOk);
   const brs=[...new Set(all.map(c=>(c.branche||'').trim()).filter(Boolean))].sort();
@@ -1523,6 +1539,9 @@ function vtLeads(){
   }},h('h2',null,'Weitergabe erfassen und exportieren'),
     h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'ld-k'},'Käufer / Empfänger'),h('input',{type:'text',id:'ld-k'})),h('div',{class:'field'},h('label',{for:'ld-p'},'Preis je Lead netto (€)'),h('input',{type:'number',id:'ld-p',min:'0',step:'1',inputmode:'decimal'})),h('div',{class:'field'},h('label',{for:'ld-z'},'Zweck (optional)'),h('input',{type:'text',id:'ld-z',placeholder:'z. B. Angebot Telefonanlagen'}))),
     st,h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Exportieren (CSV) und protokollieren'))));
+  const lt=h('textarea',{id:'ld-text',style:'min-height:110px',value:leadText()});
+  out.push(h('section',{class:'card'},h('h2',null,'Text der Einwilligung'),h('p',{class:'eyebrow',style:'margin:0'},'Nennt die Empfängerkreise, damit die Einwilligung für Werbung per E-Mail und Telefon (§ 7 UWG) bestimmt genug ist. Bitte anwaltlich prüfen lassen. Bereits erteilte Einwilligungen behalten ihren damaligen Text.'),lt,
+    h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async()=>{const v=lt.value.trim();if(v.length<80){toast('Der Text ist zu kurz.');return;}await saveCfg({leadText:v});toast('Text gespeichert');}},'Speichern'))));
   const hist=S.leadsales.slice().sort((a,b)=>String(b.at).localeCompare(String(a.at)));
   out.push(h('section',{class:'card'},h('h2',null,'Protokoll der Weitergaben'),hist.length?h('div',{class:'dlist'},...hist.map(v=>h('div',{class:'member'},h('div',{class:'who'},h('strong',null,v.kaeufer),' · '+fmtDay(v.datum).replace(/^\w+\.,\s*/,'')+' · '+v.anzahl+' Leads',h('div',{class:'eyebrow'},(v.zweck?v.zweck+' · ':'')+'durch '+v.by)),h('strong',null,eur(v.summe))))):h('div',{class:'eyebrow'},'Noch keine Weitergaben.'),
     h('div',{class:'eyebrow'},'Summe Lead-Erlöse: '+eur(r2(hist.reduce((s,v)=>s+(v.summe||0),0))))));
