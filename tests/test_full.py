@@ -8,6 +8,10 @@ time.sleep(1)
 tpl = json.load(open(''+T+'/seed_template.json'))
 legal = json.load(open(''+T+'/seed_legal.json'))
 results = []
+import re
+def realtext(v):
+    v = (v or '').strip()
+    return len(v) >= 3 and not re.fullmatch(r'[\s.,;:!?\-_xX0/\\*+#~|]+', v)
 def ok(name, cond):
     results.append((name, bool(cond)))
     print(('OK   ' if cond else 'FAIL ') + name)
@@ -56,6 +60,28 @@ try:
         page.click('button:has-text("Weiter: Anrufe heute")')
         page.wait_for_selector('#q-q04')
         ok('Abschnitt-Wechsel', page.is_visible('#q-q04'))
+        # Platzhalter zählen nicht, Pflicht- und „Entfällt“-Logik
+        page.fill('#q-q04', '.'); page.wait_for_timeout(300)
+        ok('Punkt zeigt Hinweis', page.is_visible('#qh-q04'))
+        page.click('body', position={'x': 5, 'y': 820}); page.wait_for_timeout(700)
+        ok('Punkt zählt nicht als Antwort', '14 %' in page.inner_text('.prog-mini'))
+        page.click('nav >> text=Unterschrift'); page.wait_for_selector('text=Unterschrift noch nicht möglich')
+        ok('Unterschrift gesperrt, solange Fragen offen', 'Pflichtfrage' in page.inner_text('#view'))
+        # Alle Abschnitte durchgehen: ★ beantworten, Rest „Entfällt“
+        page.click('nav >> text=Fragenkatalog'); page.wait_for_selector('.chip')
+        nsec = len(page.query_selector_all('[role=tablist] .chip'))
+        for i in range(nsec):
+            page.click('[role=tablist] .chip >> nth=%d' % i); page.wait_for_timeout(150)
+            for q in page.query_selector_all('.q'):
+                ta = q.query_selector('textarea'); qid = ta.get_attribute('id')[2:]
+                if 'star' in (q.get_attribute('class') or ''):
+                    if not realtext(ta.input_value()): page.fill('#q-' + qid, 'Antwort zu ' + qid)
+                elif not realtext(ta.input_value()):
+                    page.check('#qna-' + qid); page.wait_for_timeout(120)
+            page.click('body', position={'x': 5, 'y': 820}); page.wait_for_timeout(250)
+        page.wait_for_timeout(700)
+        cust = page.evaluate("()=>[...__rows.values()].find(r=>r.collection==='customers').data")
+        ok('Entfällt gespeichert, ★ beantwortet', cust.get('na', {}).get('q05') is True and cust['answers'].get('q04') == 'Antwort zu q04')
         page.click('nav >> text=Datenschutz & AVV')
         page.wait_for_selector('#l-dsb')
         page.fill('#l-dsb', 'Frau DSB, dsb@test.de'); page.select_option('#l-sp', 'Nur als Text, 90 Tage')

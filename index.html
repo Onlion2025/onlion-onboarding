@@ -298,7 +298,12 @@ function h(tag,attrs,...kids){
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2600);}
 function cur(){return S.customers.find(c=>c.id===S.curId)||null;}
 function allQs(){return S.tpl?S.tpl.sections.flatMap(s=>s.questions):[];}
-function answeredCount(c){const a=c.answers||{};return allQs().filter(q=>(a[q.id]||'').trim()).length;}
+/* Echte Antwort: mind. 3 Zeichen, kein Platzhalter wie „.“, „x“, „-“, „???“, „aaa“ */
+function realAnswer(v){const s=String(v||'').trim();if(s.length<3)return false;if(/^[\s.,;:!?\-_xX0\/\\*+#~|]+$/.test(s))return false;const t=s.replace(/\s/g,'').toLowerCase();if(/^(.)\1+$/.test(t))return false;if(/^(n\/?a|test|asdf|qwer|xyz|abc|bla|blabla|egal|keine?|nix|nichts)$/.test(t))return false;return true;}
+function isNA(c,q){return !q.star&&!!(c.na&&c.na[q.id]);}
+function answered(c,q){return realAnswer((c.answers||{})[q.id])||isNA(c,q);}
+function answeredCount(c){return allQs().filter(q=>answered(c,q)).length;}
+function missingQs(c){return allQs().filter(q=>!answered(c,q));}
 function legalOk(c){const l=c.legal||{};return !!(l.dsb&&l.speicherung&&l.hinweis&&l.agb);}
 function signed(c){return !!(c&&c.signature&&c.signature.hash);}
 /* CRM: gespeicherter Status; „Unterschrieben“ ergibt sich automatisch aus der Unterschrift */
@@ -316,7 +321,7 @@ function crmPatch(c,status){
 const STAMM=[['firma','Firma'],['ansprechpartner','Ansprechpartner'],['email','E-Mail'],['telefon','Telefon'],['adresse','Adresse']];
 const LEGAL_REQ=['dsb','speicherung','hinweis','agb'];
 function progress(c){
-  const a=c.answers||{},l=c.legal||{},qs=allQs(),has=q=>!!(a[q.id]||'').trim();
+  const l=c.legal||{},qs=allQs(),has=q=>answered(c,q);
   const stars=qs.filter(q=>q.star);
   const qDone=qs.filter(has).length,sDone=stars.filter(has).length;
   const stDone=STAMM.filter(([k])=>(c[k]||'').trim()).length,lDone=LEGAL_REQ.filter(k=>!!l[k]).length;
@@ -453,7 +458,7 @@ function viewStart(c){
   const ro=signed(c);
   const f=(id,label,key,type)=>h('div',{class:'field'},h('label',{for:id},label),h('input',{type:type||'text',id,value:c[key]||'',disabled:ro,oninput:e=>{const p={};p[key]=e.target.value;saveCust(c.id,p);},onchange:e=>{const v=e.target.value.replace(/\s+/g,' ').trim();if(v!==e.target.value){e.target.value=v;const p={};p[key]=v;saveCust(c.id,p);}}}));
   const stamm=h('section',{class:'card','aria-label':'Stammdaten'},h('h2',null,'Stammdaten'),
-    h('div',{class:'grid2'},f('s-firma','Firma','firma'),f('s-ap','Ansprechpartner','ansprechpartner'),f('s-mail','E-Mail','email','email'),f('s-tel','Telefon','telefon','tel'),f('s-adr','Adresse','adresse')));
+    h('div',{class:'grid2'},f('s-firma','Firma','firma'),f('s-ap','Ansprechpartner','ansprechpartner'),f('s-mail','E-Mail','email','email'),f('s-tel','Telefon','telefon','tel'),f('s-adr','Adresse','adresse'),f('s-br','Branche','branche')));
   const del=S.confirm==='del'+c.id
     ?h('div',{class:'confirm'},'Kundenakte „'+(c.firma||'')+'“ endgültig löschen?',h('button',{type:'button',class:'btn danger',onclick:async()=>{await S.db.doc('customers/'+c.id).delete();S.curId=null;S.confirm=null;S.view='start';toast('Kundenakte gelöscht');render();}},'Ja, löschen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
     :h('button',{type:'button',class:'btn danger',onclick:()=>{S.confirm='del'+c.id;render();}},'Kundenakte löschen');
@@ -461,7 +466,7 @@ function viewStart(c){
   return [
     h('div',{class:'row',style:'align-items:flex-end'},h('div',null,h('div',{class:'eyebrow'},'KI-Telefon-Agent'),h('h1',null,c.firma||'Ohne Namen')),h('div',{class:'spacer'}),
       next?h('button',{type:'button',class:'btn primary',onclick:()=>{S.view=next.id;render();}},'Weiter: '+next.t):null),
-    crmCard(c),payCard(c),progressEl(c,false),stages,stamm,isAdmin()?h('div',{class:'row'},del):null];
+    stamm,crmCard(c),payCard(c),progressEl(c,false),stages,isAdmin()?h('div',{class:'row'},del):null];
 }
 
 function viewFragen(c){
@@ -474,13 +479,16 @@ function viewFragen(c){
     const num=allQs().indexOf(q)+1;
     return h('div',{class:'q'+(q.star?' star':'')},
       h('label',{for:'q-'+q.id},num+' · '+q.text+' ',q.star?h('span',{class:'star-mark','aria-label':'im Termin klären'},'★'):null),
-      h('textarea',{id:'q-'+q.id,disabled:ro,value:a[q.id]||'',oninput:e=>{const p={answers:{}};p.answers[q.id]=e.target.value;saveCust(c.id,p);}}));
+      (()=>{const hint=h('div',{class:'eyebrow late',id:'qh-'+q.id,hidden:!(a[q.id]&&!realAnswer(a[q.id]))},'Bitte eine echte Antwort eintragen (mindestens 3 Zeichen, kein Platzhalter).');
+        const na=isNA(c,q);
+        return [h('textarea',{id:'q-'+q.id,disabled:ro||na,value:na?'':(a[q.id]||''),placeholder:na?'Entfällt':'',oninput:e=>{const p={answers:{}};p.answers[q.id]=e.target.value;saveCust(c.id,p);hint.hidden=!(e.target.value.trim()&&!realAnswer(e.target.value));}}),hint,
+          q.star?null:h('label',{class:'check',style:'min-height:36px;padding-block:2px;font-size:14px'},h('input',{type:'checkbox',id:'qna-'+q.id,disabled:ro,checked:na,onchange:e=>{const p={na:{}};p.na[q.id]=e.target.checked;saveCust(c.id,p,0);render._force=true;render();}}),'Entfällt für diesen Kunden')];})());
   });
   return [
     h('div',{class:'row',style:'align-items:flex-end'},h('div',null,h('div',{class:'eyebrow'},c.firma+' · KI-Telefon-Agent'),h('h1',null,'Fragenkatalog')),h('div',{class:'spacer'}),
       h('div',{class:'row'},h('span',{class:'eyebrow tabnum'},n+' von '+total+' beantwortet'),h('div',{class:'progress','aria-hidden':'true'},h('div',{style:'width:'+(total?Math.round(n/total*100):0)+'%'})))),
     lockedBanner(c),progressEl(c,true),chips,...qs,
-    h('div',{class:'row'},h('span',{class:'eyebrow'},'★ = im Termin klären · Antworten werden automatisch gespeichert'),h('div',{class:'spacer'}),
+    h('div',{class:'row'},h('span',{class:'eyebrow'},'★ = Pflichtfrage · andere Fragen: Antwort oder „Entfällt“ · wird automatisch gespeichert'),h('div',{class:'spacer'}),
       si>0?h('button',{type:'button',class:'btn',onclick:()=>{S.section=si-1;render();window.scrollTo(0,0);}},'Zurück'):null,
       si<secs.length-1?h('button',{type:'button',class:'btn primary',onclick:()=>{S.section=si+1;render();window.scrollTo(0,0);}},'Weiter: '+secs[si+1].title)
         :h('button',{type:'button',class:'btn primary',onclick:()=>{S.view='datenschutz';render();window.scrollTo(0,0);}},'Weiter: Datenschutz'))];
@@ -530,11 +538,11 @@ function makePad(key){
 function checkSign(){
   const b=document.getElementById('signBtn');if(!b)return;
   const ok=S.pads.kunde&&!S.pads.kunde.st.empty&&S.pads.onlion&&!S.pads.onlion.st.empty&&(document.getElementById('sg-name')||{}).value&&(document.getElementById('sg-ort')||{}).value;
-  b.disabled=!ok;
+  b.disabled=!ok||!!S.signBlocked;
 }
 function canonical(c,extra){
   const legalTexts=legalDocs().map(d=>({title:d.title,body:fill(d.body,c)}));
-  const qa=allQs().map(q=>({q:q.text,a:(c.answers||{})[q.id]||''}));
+  const qa=allQs().map(q=>({q:q.text,a:isNA(c,q)?'entfällt':((c.answers||{})[q.id]||'')}));
   return JSON.stringify({firma:c.firma||'',adresse:c.adresse||'',ansprechpartner:c.ansprechpartner||'',email:c.email||'',telefon:c.telefon||'',qa,legal:c.legal||{},legalTexts,extra});
 }
 async function sha256(str){
@@ -557,7 +565,10 @@ function viewUnterschrift(c){
       h('div',{class:'row'},reset,h('div',{class:'spacer'}),h('button',{type:'button',class:'btn primary',onclick:()=>{S.view='pdf';render();}},'Weiter: PDF'))];
   }
   const missing=[];
-  if(answeredCount(c)<allQs().length)missing.push((allQs().length-answeredCount(c))+' Fragen');
+  const mq=missingQs(c),mStars=mq.filter(q=>q.star);const qBlock=mq.length>0;
+  if(mStars.length)missing.push(mStars.length+' Pflichtfrage'+(mStars.length>1?'n':'')+' (★): '+mStars.map(q=>allQs().indexOf(q)+1).join(', '));
+  if(mq.length-mStars.length)missing.push((mq.length-mStars.length)+' weitere Frage'+(mq.length-mStars.length>1?'n':'')+' ohne Antwort oder „Entfällt“: '+mq.filter(q=>!q.star).map(q=>allQs().indexOf(q)+1).join(', '));
+  S.signBlocked=qBlock;
   if(!legalOk(c))missing.push('Datenschutz-Pflichtangaben');
   const signBtn=h('button',{type:'button',class:'btn primary',id:'signBtn',disabled:true,onclick:async e=>{
     e.target.disabled=true;
@@ -573,7 +584,8 @@ function viewUnterschrift(c){
     catch(err){toast('Nicht gespeichert: '+(err&&err.message||err));e.target.disabled=false;}
   }},'Verbindlich unterschreiben');
   return [h('div',null,h('div',{class:'eyebrow'},c.firma),h('h1',null,'Unterschrift')),
-    missing.length?h('div',{class:'banner warn'},'Noch offen: '+missing.join(' · ')+'. Unterschreiben geht trotzdem, das PDF zeigt die offenen Punkte.'):h('div',{class:'banner ok'},'Fragenkatalog und Datenschutz sind vollständig.'),
+    qBlock?h('div',{class:'banner warn'},h('strong',null,'Unterschrift noch nicht möglich. '),'Noch offen: '+missing.join(' · ')+'. ',h('button',{type:'button',class:'linkbtn',style:'display:inline;min-height:0;padding:0',onclick:()=>{const q=mq[0];const secs=S.tpl.sections;S.section=Math.max(0,secs.findIndex(s=>s.questions.includes(q)));S.view='fragen';render();setTimeout(()=>{const el=document.getElementById('q-'+q.id);el&&el.focus();},50);}},'Zur ersten offenen Frage'))
+      :missing.length?h('div',{class:'banner warn'},'Noch offen: '+missing.join(' · ')+'. Unterschreiben geht trotzdem, das PDF zeigt die offenen Punkte.'):h('div',{class:'banner ok'},'Fragenkatalog und Datenschutz sind vollständig.'),
     h('p',{style:'margin:0;max-width:70ch;color:var(--muted)'},'Mit der Unterschrift bestätigen beide Seiten die Angaben im Fragenkatalog und die Vereinbarung zur Auftragsverarbeitung in der Fassung der Vorschau. Gespeichert werden Name, Ort, Zeitpunkt und eine Prüfsumme des Inhalts.'),
     h('div',{class:'grid2'},
       h('div',{class:'field'},h('label',{for:'sg-name'},'Name des Unterzeichners (Kunde)'),h('input',{type:'text',id:'sg-name',value:c.ansprechpartner||'',oninput:checkSign})),
@@ -640,7 +652,7 @@ async function buildPdf(c){
   for(const s of (S.tpl?S.tpl.sections:[])){
     let first=true;
     for(const q of s.questions){
-      const a=T((c.answers||{})[q.id]);
+      const a=isNA(c,q)?'entfällt':T((c.answers||{})[q.id]);
       const ql=wrap(q.text,9.5,'bold',QW),al=wrap(a||'offen',9.5,a?'normal':'italic',QW);
       const hgt=ql.length*lh(9.5)+1.5+al.length*lh(9.5)+5;
       if(first){need(hgt+8);sub(s.title);first=false;}else need(hgt);
