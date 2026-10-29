@@ -37,6 +37,8 @@ button,input,textarea,select{font:inherit;color:inherit}
 .side{flex:1 1 250px;max-width:280px;background:var(--panel);border-right:1px solid var(--line);padding-block:24px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:18px;display:flex;flex-direction:column;gap:24px}
 .main{flex:999 1 560px;min-width:0;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .main-inner{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:22px;padding-inline:clamp(0px,2vw,24px)}
+.brand{display:block;text-decoration:none;border-radius:10px}
+.brand:hover img{opacity:.85}
 .brand img{width:150px;display:block}
 .brand .prod{color:var(--accent-ink);font-weight:600;font-size:15px;margin-top:6px}
 .label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
@@ -227,7 +229,7 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
 </div>
 <div class="app">
   <nav class="side" aria-label="Navigation">
-    <div class="brand"><img src="logo-black.png" alt="ONLION"><div class="prod" id="prodName">KI-Telefon-Agent</div></div>
+    <a class="brand" id="homeLink" href="#" aria-label="ONLION – zur Startseite (Dashboard)"><img src="logo-black.png" alt="ONLION"><div class="prod" id="prodName">KI-Telefon-Agent</div></a>
     <div class="group settings" id="dashGroup">
       <div class="label">Überblick</div>
       <button class="navbtn" id="navDash" type="button">Dashboard</button>
@@ -329,6 +331,8 @@ function crmPatch(c,status){
   return {crm:{status,history:hist}};
 }
 const STAMM=[['firma','Firma'],['ansprechpartner','Ansprechpartner'],['email','E-Mail'],['telefon','Telefon'],['adresse','Adresse']];
+const STAMM_KEYS=['firma','ansprechpartner','email','telefon','adresse','branche'];
+const STAMM_LABEL={firma:'Firma',ansprechpartner:'Ansprechpartner',email:'E-Mail',telefon:'Telefon',adresse:'Adresse',branche:'Branche'};
 const LEGAL_REQ=['dsb','speicherung','hinweis','agb'];
 function progress(c){
   const l=c.legal||{},qs=allQs(),has=q=>answered(c,q);
@@ -465,9 +469,12 @@ function viewStart(c){
     const k=String(i+1).padStart(2,'0')+' · '+(state==='done'?'ERLEDIGT':state==='now'?'IN ARBEIT':state==='locked'?'BALD':'OFFEN');
     stages.append(h('li',null,h('button',{type:'button',class:'stage '+state,disabled:state==='locked',onclick:()=>{S.view=st.id;render();}},h('span',{class:'k'},k),h('span',{class:'t'},st.t),h('span',{class:'d'},d))));
   });
-  const ro=signed(c);
-  const f=(id,label,key,type)=>h('div',{class:'field'},h('label',{for:id},label),h('input',{type:type||'text',id,value:c[key]||'',disabled:ro,oninput:e=>{const p={};p[key]=e.target.value;saveCust(c.id,p);},onchange:e=>{const v=e.target.value.replace(/\s+/g,' ').trim();if(v!==e.target.value){e.target.value=v;const p={};p[key]=v;saveCust(c.id,p);}}}));
+  const sgS=signed(c)?(c.signature.stamm||null):null;
+  const ensureSnap=()=>{if(signed(c)&&!c.signature.stamm){const snap={};for(const k of STAMM_KEYS)snap[k]=c[k]||'';c.signature.stamm=snap;saveCust(c.id,{signature:{stamm:snap}},0);}};
+  const f=(id,label,key,type)=>h('div',{class:'field'},h('label',{for:id},label),h('input',{type:type||'text',id,value:c[key]||'',onfocus:ensureSnap,oninput:e=>{ensureSnap();const p={};p[key]=e.target.value;saveCust(c.id,p);},onchange:e=>{const v=e.target.value.replace(/\s+/g,' ').trim();if(v!==e.target.value){e.target.value=v;const p={};p[key]=v;saveCust(c.id,p);}}}));
+  const changed=sgS?STAMM_KEYS.filter(k=>k!=='branche'&&String(sgS[k]||'').trim()!==String(c[k]||'').trim()):[];
   const stamm=h('section',{class:'card','aria-label':'Stammdaten'},h('h2',null,'Stammdaten'),
+    changed.length?h('div',{class:'banner info'},'Geändert seit der Unterschrift: '+changed.map(k=>STAMM_LABEL[k]).join(', ')+'. Das PDF und die Vereinbarung zeigen weiter die unterschriebene Fassung ('+changed.map(k=>STAMM_LABEL[k]+': „'+(sgS[k]||'–')+'“').join(', ')+'). Für eine neue Fassung unter „Unterschrift“ eine neue Version starten.'):null,
     h('div',{class:'grid2'},f('s-firma','Firma','firma'),f('s-ap','Ansprechpartner','ansprechpartner'),f('s-mail','E-Mail','email','email'),f('s-tel','Telefon','telefon','tel'),f('s-adr','Adresse','adresse'),f('s-br','Branche','branche')));
   const del=S.confirm==='del'+c.id
     ?h('div',{class:'confirm'},'Kundenakte „'+(c.firma||'')+'“ endgültig löschen?',h('button',{type:'button',class:'btn danger',onclick:async()=>{try{const {data:fl}=await S.sb.storage.from('sprachnotizen').list(c.id);if(fl&&fl.length)await S.sb.storage.from('sprachnotizen').remove(fl.map(f=>c.id+'/'+f.name));}catch(x){}await S.db.doc('customers/'+c.id).delete();S.curId=null;S.confirm=null;S.view='start';toast('Kundenakte gelöscht');render();}},'Ja, löschen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
@@ -603,7 +610,8 @@ function viewUnterschrift(c){
     const fresh=cur()||c;
     const signedAt=new Date().toISOString();
     const hash=await sha256(canonical(fresh,{signedAt,ort,kunde:name}));
-    const up={signature:{kunde,onlion,ort,signedAt,hash,version:(c.history||[]).length+1}};
+    const stammSnap={};for(const k of STAMM_KEYS)stammSnap[k]=fresh[k]||'';
+    const up={signature:{kunde,onlion,ort,signedAt,hash,stamm:stammSnap,version:(c.history||[]).length+1}};
     const lo=document.getElementById('lead-ok');if(lo&&lo.checked)up.leadConsent={given:true,at:signedAt,text:leadText(),name,by:(S.me&&S.me.email)||'',quelle:'Unterschrift',widerrufenAm:null};const cs=crmOf(fresh).status||'neu';if(cs!=='verloren'&&(CRM_RANK[cs]||0)<CRM_RANK.unterschrieben)Object.assign(up,crmPatch(fresh,'unterschrieben'));
     try{await S.db.doc('customers/'+c.id).update(up);toast('Unterschrieben');}
     catch(err){toast('Nicht gespeichert: '+(err&&err.message||err));e.target.disabled=false;}
@@ -627,6 +635,7 @@ function viewUnterschrift(c){
 function clean(s){return String(s==null?'':s).replace(/[„“”]/g,'"').replace(/[‚‘’]/g,"'").replace(/[–—]/g,'-').replace(/…/g,'...').replace(/€/g,'EUR').replace(/★/g,'*').replace(/[^\x00-\xFF\n]/g,'');}
 async function imgData(url){const r=await fetch(url);const b=await r.blob();return await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(b);});}
 async function buildPdf(c){
+  if(signed(c)&&c.signature.stamm)c=Object.assign({},c,c.signature.stamm);
   const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'mm',format:'a4'});
   const W=210,M=18,CW=W-2*M,BOT=276; let y=0;
   const INK=[28,28,26],MUT=[112,112,104],ACC=[74,102,0],LIME=[200,255,0],SOFT=[245,245,241],LINE=[224,224,216];
@@ -1690,6 +1699,7 @@ function render(){
 document.addEventListener('focusout',()=>{setTimeout(()=>{const a=document.activeElement;const typing=a&&a.closest&&a.closest('#view')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);if(S.pendingRender&&!typing&&S.view!=='unterschrift'){S.pendingRender=false;render();}},50);});
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button');if(b)render._force=true;setTimeout(()=>render._force=false,0);},true);
 document.getElementById('navTpl').addEventListener('click',()=>{S.view='vorlagen';render();});
+document.getElementById('homeLink').addEventListener('click',e=>{e.preventDefault();if(S.blocked)return;S.view='dashboard';S.confirm=null;render();window.scrollTo(0,0);});
 document.getElementById('navDash').addEventListener('click',()=>{S.view='dashboard';render();window.scrollTo(0,0);});
 document.getElementById('navVertrieb').addEventListener('click',()=>{S.view='vertrieb';S.confirm=null;S.editPartner=null;render();window.scrollTo(0,0);});
 document.getElementById('navKonto').addEventListener('click',()=>{S.view='konto';S.confirm=null;S.pwMsg=null;S.pwOpen=false;S.invMsg=null;render();if(S.sb){const before=JSON.stringify(S.team);loadTeam().then(()=>{if(S.view==='konto'&&JSON.stringify(S.team)!==before)render();}).catch(()=>{});}});
