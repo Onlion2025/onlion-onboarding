@@ -1107,7 +1107,7 @@ function computeRows(z,batch){
   else if(z.sonder!==undefined)sonder=z.sonder;
   const R=v.rates||{};const zahlPool=S.zahl.concat(batch||[]);
   const akts=z.art==='einrichtung'?aktionenAt(z.datum):[];
-  const firstSale=!zahlPool.some(x=>x.id!==z.id&&x.partner===seller&&x.art==='einrichtung'&&!x.storniert&&x.netto>0)&&!liveProv().some(r=>r.von===seller&&r.ebene===1&&r.aktion&&(cfg().aktionen.find(a=>a.id===r.aktion)||{}).typ==='starthilfe');
+  const firstSale=!zahlPool.some(x=>x.id!==z.id&&x.partner===seller&&x.art==='einrichtung'&&!x.storniert&&x.netto>0)&&!liveProv().some(r=>r.von===seller&&r.ebene===1&&(r.starthilfe||(r.aktion&&(cfg().aktionen.find(a=>a.id===r.aktion)||{}).typ==='starthilfe')));
   const stp=tm(seller)||{};const joined=String(stp.vertrag_am||stp.added_at||'').slice(0,10);
   const isNew=!joined||(new Date(z.datum+'T12:00')-new Date(joined+'T12:00'))/864e5<=183;
   const sh=firstSale&&isNew?akts.find(a=>a.typ==='starthilfe'):null;
@@ -1135,7 +1135,7 @@ function computeRows(z,batch){
       out.push({id:uid(),partner:seller,ebene:0,art:'bonus',aktion:a.id,aktionName:a.name||AKT_TYP[a.typ],zahlungId:z.id,customerId:z.customerId,kunde:z.firma||'',von:'',basis:r2(z.netto),satz,betrag,datum:z.datum,monat:'',lizenzMonat:null,version:v.id,status:'faellig',gutschriftId:null,at:new Date().toISOString()});
     }
   }
-  if(sh)for(const r of out)if(r.ebene===1&&r.art==='einrichtung'){r.aktion=sh.id;r.aktionName=sh.name||AKT_TYP.starthilfe;}
+  if(sh)for(const r of out)if(r.ebene===1&&r.art==='einrichtung'){r.aktion=sh.id;r.starthilfe=true;r.aktionName=sh.name||AKT_TYP.starthilfe;}
   return out;
 }
 async function bookPayments(list){

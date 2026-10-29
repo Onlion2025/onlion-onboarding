@@ -12,7 +12,7 @@ grant select, insert, update, delete on public.docs to authenticated;`);
 await ex(fs.readFileSync(R + 'team.sql', 'utf8'));
 await ex(`create schema storage;
 create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
-create table storage.objects (bucket_id text, name text, owner uuid, primary key (bucket_id, name));
+create table storage.objects (bucket_id text, name text, owner_id text, primary key (bucket_id, name));
 create function auth.uid() returns uuid language sql stable as $u$ select nullif(auth.jwt() ->> 'sub','')::uuid $u$; grant execute on function auth.uid() to authenticated;
 alter table storage.objects enable row level security;
 create function storage.foldername(name text) returns text[] language sql immutable as $f$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'),1)-1] $f$;

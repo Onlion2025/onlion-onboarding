@@ -26,7 +26,7 @@ create policy "Sprachnotizen hochladen" on storage.objects for insert to authent
   with check (bucket_id = 'sprachnotizen' and public.can_access_customer((storage.foldername(name))[1]));
 -- Löschen: ONLION alles, Partner nur selbst aufgenommene Notizen
 create policy "Sprachnotizen löschen" on storage.objects for delete to authenticated
-  using (bucket_id = 'sprachnotizen' and (public.is_admin() or (owner = auth.uid() and public.can_access_customer((storage.foldername(name))[1]))));
+  using (bucket_id = 'sprachnotizen' and (public.is_admin() or (owner_id = auth.uid()::text and public.can_access_customer((storage.foldername(name))[1]))));
 
 -- Kontrolle: 3 Zeilen
 select policyname, cmd from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname like 'Sprachnotizen%';
