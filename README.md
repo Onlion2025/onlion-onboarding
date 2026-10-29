@@ -70,9 +70,15 @@ In Netlify unter **Site configuration → Environment variables** diese Werte an
 | `SUPABASE_SERVICE_ROLE_KEY` | **service_role**-Schlüssel aus Supabase (Project Settings → API). Nur hier eintragen, als Secret markieren, nie in `config.js`. Wird für Einladungen, „Passwort vergessen?“ und die Team-Prüfung gebraucht. |
 | `OWNER_EMAIL` | deine Adresse für eine Blindkopie jeder Mail |
 | `REPLY_TO_EMAIL` | optional: Adresse für Antworten |
+| `ELEVENLABS_API_KEY` | API-Schlüssel von ElevenLabs für die Abschrift der Sprachnotizen (Secret). |
 | `APP_URL` | optional: eigene App-Adresse für Links in E-Mails. Ohne Angabe gilt die Netlify-Adresse. |
 
 Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist. Die Schlüssel verlassen den Server nie.
+
+### Update: Sprachnotizen, Leads, Aktionen (Oktober 2026)
+1. In Supabase `supabase/sprachnotizen.sql` ausführen (privater Speicher für Sprachnotizen und Zugriffsregeln). Kontrolle am Ende: 3 Zeilen.
+2. In ElevenLabs einen API-Schlüssel mit Berechtigung „Speech to Text“ anlegen und in Netlify als Secret `ELEVENLABS_API_KEY` eintragen, danach **Trigger deploy**.
+3. Mit ElevenLabs einen Auftragsverarbeitungsvertrag (DPA) abschließen; Sprachnotizen können personenbezogene Daten enthalten.
 
 ### Update: Vertriebspartner und Provisionen (Oktober 2026)
 1. In Supabase `supabase/vertrieb.sql` ausführen (nach `team.sql`). Kontrolle am Ende: 8 Policies auf `docs`, 3 auf `team`.
@@ -105,6 +111,11 @@ Jede Anfrage an Brevo prüft vorher, dass ein Konto aus dem Team angemeldet ist.
   - *Abrechnung:* je Monat eine Gutschrift (PDF) je Partner, mit 19 % USt oder ohne bei Kleinunternehmern; danach „ausgezahlt“ markieren. Storno nach Auszahlung wird als Rückforderung auf die nächste Gutschrift gebucht.
 - **Provisionen werden nur aus verbuchten Zahlungseingängen berechnet**, nie fürs Anwerben. Anteile aus Ebene 1 und 2 nur bei eigenem bezahlten Abschluss im laufenden oder vorigen Quartal (einstellbar).
 - **Vertriebspartner** sehen nur ihre eigenen Kunden (die sie anlegen oder die ihnen zugeordnet sind), ihre Konditionen, ihr Provisionskonto, ihre Gutschriften und die Namen ihrer Struktur. Keine Zahlungen, keine fremden Kunden, keine Vorlagen-Bearbeitung. Das sichert die Datenbank ab (`supabase/vertrieb.sql`).
+- **Stammdaten** stehen oben in jeder Kundenakte (neu: Branche).
+- **Fragenkatalog:** Punkt, „x“ und ähnliche Platzhalter zählen nicht als Antwort. ★-Fragen sind Pflicht, andere Fragen brauchen eine echte Antwort oder „Entfällt“ – sonst ist keine Unterschrift möglich.
+- **Sprachnotizen** im Bereich Vertrieb der Kundenakte: aufnehmen (max. 5 Minuten), Abschrift landet automatisch im Gesprächsprotokoll, Anhören und Löschen. Nur für eigene Notizen; Gespräche nicht ohne Zustimmung mitschneiden (§ 201 StGB).
+- **Leads:** freiwillige Einwilligung zur Weitergabe der Kontaktdaten bei der Unterschrift (oder nachträglich mit Nachweis), jederzeit widerrufbar. Unter Vertrieb → Leads nur Kunden mit Einwilligung exportieren; jede Weitergabe wird mit Käufer und Preis protokolliert. Anruferdaten und Fragenkatalog werden nie weitergegeben.
+- **Incentive-Aktionen** unter Vertrieb → Provisionsmodell: Prozent-Aufschlag, Bonus für große Kunden, Starthilfe für Werber (erster bezahlter Kunde eines neuen Partners). Mit Zeitraum, jederzeit ein- und ausschaltbar; Partner sehen laufende Aktionen.
 - **Konto & Team:** eigenes Passwort ändern (mit aktuellem Passwort bestätigt). Als Inhaber Personen per E-Mail einladen, den Link erneut senden oder den Zugang entfernen. Eingeladene legen ihr Passwort über den Link selbst fest und sehen alle Kunden.
 - **Passwort vergessen?** auf der Anmeldeseite schickt einen Link zum Neusetzen, aber nur an Adressen aus dem Team.
 

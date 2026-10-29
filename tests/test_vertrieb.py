@@ -197,6 +197,45 @@ try:
         team_off = [dict(t, status='inaktiv') if t['email'] == 'p2@x.de' else t for t in TEAM]
         off = page_for(ctx, team_off, rows2); login(off, 'p2@x.de'); off.wait_for_selector('h1:has-text("Kein Zugriff")')
         ok('Inaktiver Partner gesperrt', True)
+        # ---------- Incentive-Aktionen ----------
+        today = time.strftime('%Y-%m-%d')
+        TEAM2 = [{'email': 'adam@test.de', 'role': 'owner', 'status': 'aktiv'},
+                 {'email': 's@x.de', 'role': 'partner', 'sponsor': None, 'status': 'aktiv', 'name': 'Sven Werber'},
+                 {'email': 'n@x.de', 'role': 'partner', 'sponsor': 's@x.de', 'status': 'aktiv', 'name': 'Nina Neu'}]
+        SEED2 = SEED + [{'collection': 'zahlungen', 'id': 'zs', 'data': {'id': 'zs', 'customerId': 'cs', 'firma': 'S Kunde', 'partner': 's@x.de', 'art': 'einrichtung', 'netto': 2500, 'datum': today, 'storniert': False}}]
+        i2 = page_for(ctx, TEAM2, SEED2); login(i2, 'adam@test.de')
+        i2.click('#navVertrieb'); i2.click('.chip:has-text("Provisionsmodell")'); i2.wait_for_selector('#ak-typ')
+        i2.fill('#ak-name', 'Herbstaktion'); i2.fill('#ak-wert', '5'); i2.click('button:has-text("Aktion anlegen")'); i2.wait_for_timeout(300)
+        i2.select_option('#ak-typ', 'gross'); i2.wait_for_timeout(150); i2.fill('#ak-wert', '250'); i2.click('button:has-text("Aktion anlegen")'); i2.wait_for_timeout(300)
+        i2.select_option('#ak-typ', 'starthilfe'); i2.wait_for_timeout(150); i2.click('button:has-text("Aktion anlegen")'); i2.wait_for_timeout(300)
+        ak = i2.evaluate("()=>[...__rows.values()].find(r=>r.collection==='config').data.aktionen")
+        ok('3 Aktionen angelegt und aktiv', len(ak) == 3 and all(a['aktiv'] for a in ak) and next(a for a in ak if a['typ']=='starthilfe')['prozent'] == 50)
+        ok('Margen-Warnung bei Starthilfe', 'gehen an Partner' in i2.inner_text('#view'))
+        i2.screenshot(path=T + '/v-aktionen.png', full_page=True)
+        i2.click('text=+ Neuer Kunde'); i2.fill('#nc-firma', 'Groß GmbH'); i2.click('text=Anlegen'); i2.wait_for_selector('h1:has-text("Groß GmbH")')
+        i2.select_option('#pay-partner', 'n@x.de'); i2.wait_for_timeout(300)
+        i2.click('nav >> text=Angebot'); i2.click('.chip:has-text("50–249 Mitarbeitende")'); i2.wait_for_timeout(400)
+        i2.click('nav >> text=Übersicht'); i2.wait_for_selector('#pay-amt')
+        i2.click('button:has-text("Zahlungseingang verbuchen")'); i2.wait_for_timeout(700)
+        pv = [x for x in prov(i2) if x.get('kunde') == 'Groß GmbH' or x.get('von') == 'n@x.de']
+        bys = sorted([(x['partner'], x['art'], x['betrag']) for x in pv])
+        ok('Aktionen berechnet (%s)' % bys, ('n@x.de', 'einrichtung', 2500) in bys and ('n@x.de', 'bonus', 250) in bys and bys.count(('n@x.de', 'bonus', 250)) == 2 and ('s@x.de', 'einrichtung', 2500) in bys)
+        # zweiter Kunde: keine Starthilfe mehr
+        i2.click('text=+ Neuer Kunde'); i2.fill('#nc-firma', 'Zweit KG'); i2.click('text=Anlegen'); i2.wait_for_selector('h1:has-text("Zweit KG")')
+        i2.select_option('#pay-partner', 'n@x.de'); i2.wait_for_timeout(300)
+        i2.click('nav >> text=Angebot'); i2.click('.chip:has-text("1–49 Mitarbeitende")'); i2.wait_for_timeout(400)
+        i2.click('nav >> text=Übersicht'); i2.wait_for_selector('#pay-amt')
+        i2.click('button:has-text("Zahlungseingang verbuchen")'); i2.wait_for_timeout(700)
+        s2 = [x for x in prov(i2) if x['partner'] == 's@x.de' and x['art'] == 'einrichtung' and x['basis'] == 2500]
+        ok('Starthilfe nur beim ersten Kunden (%s)' % [x['satz'] for x in s2], len(s2) == 1 and s2[0]['satz'] == 10)
+        # Aktion ausschalten
+        i2.click('#navVertrieb'); i2.click('.chip:has-text("Provisionsmodell")'); i2.wait_for_selector('#ak-typ')
+        i2.click('.member:has-text("Herbstaktion") input[type=checkbox]'); i2.wait_for_timeout(300)
+        ok('Aktion ausschaltbar', not next(a for a in i2.evaluate("()=>[...__rows.values()].find(r=>r.collection==='config').data.aktionen") if a['name'] == 'Herbstaktion')['aktiv'])
+        rows3 = i2.evaluate("()=>[...__rows.values()]")
+        pn = page_for(ctx, TEAM2, rows3); login(pn, 'n@x.de'); pn.click('#navVertrieb'); pn.wait_for_selector('text=Provisionskonto')
+        ok('Partner sieht laufende Aktionen und Bonus', 'Aktuelle Aktionen' in pn.inner_text('#view') and 'Bonus für große Kunden' in pn.inner_text('#view') and 'Herbstaktion' in pn.inner_text('#view'))
+        pn.screenshot(path=T + '/v-partner-aktionen.png', full_page=True)
         ok('Keine JS-Fehler ' + '; '.join(errors), not errors)
         b.close()
 finally:
