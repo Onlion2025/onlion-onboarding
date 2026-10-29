@@ -278,7 +278,7 @@ const CRM=[
 ];
 const CRM_RANK={neu:0,angerufen:1,termin:2,unterschrieben:3,abgeschlossen:4};
 const QUELLEN=['Empfehlung','Event','Kaltakquise','Website','Social Media','Bestandskunde','Sonstiges'];
-const S={me:null,team:[],blocked:false,prov:[],zahl:[],gs:[],vorschl:[],cfg:null,struct:[],db:null,dl:null,customers:[],tpl:null,legal:null,curId:null,view:'start',section:0,newOpen:false,loaded:false,pendingRender:false,confirm:null,pads:{}};
+const S={me:null,team:[],blocked:false,leadsales:[],prov:[],zahl:[],gs:[],vorschl:[],cfg:null,struct:[],db:null,dl:null,customers:[],tpl:null,legal:null,curId:null,view:'start',section:0,newOpen:false,loaded:false,pendingRender:false,confirm:null,pads:{}};
 
 function h(tag,attrs,...kids){
   const el=document.createElement(tag);
@@ -299,6 +299,8 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 function cur(){return S.customers.find(c=>c.id===S.curId)||null;}
 function allQs(){return S.tpl?S.tpl.sections.flatMap(s=>s.questions):[];}
 /* Echte Antwort: mind. 3 Zeichen, kein Platzhalter wie „.“, „x“, „-“, „???“, „aaa“ */
+const LEAD_TEXT='Ich bin einverstanden, dass ONLION die Kontaktdaten meines Unternehmens (Firma, Branche, Anschrift, Ansprechpartner, E-Mail, Telefon) an ausgewählte Geschäftspartner weitergibt, die mir passende Angebote für mein Unternehmen machen dürfen – auch per E-Mail und Telefon. Die Einwilligung ist freiwillig und unabhängig vom Vertrag über den KI-Telefon-Agenten. Ich kann sie jederzeit ohne Angabe von Gründen gegenüber ONLION widerrufen; die Weitergabe endet dann für die Zukunft.';
+function leadOk(c){const l=c&&c.leadConsent;return !!(l&&l.given&&!l.widerrufenAm);}
 function realAnswer(v){const s=String(v||'').trim();if(s.length<3)return false;if(/^[\s.,;:!?\-_xX0\/\\*+#~|]+$/.test(s))return false;const t=s.replace(/\s/g,'').toLowerCase();if(/^(.)\1+$/.test(t))return false;if(/^(n\/?a|test|asdf|qwer|xyz|abc|bla|blabla|egal|keine?|nix|nichts)$/.test(t))return false;return true;}
 function isNA(c,q){return !q.star&&!!(c.na&&c.na[q.id]);}
 function answered(c,q){return realAnswer((c.answers||{})[q.id])||isNA(c,q);}
@@ -549,6 +551,19 @@ async function sha256(str){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
+function consentCard(c){
+  const l=c.leadConsent||{};const ok=leadOk(c);
+  const body=[h('div',{class:'label'},'Einwilligung Weitergabe Kontaktdaten')];
+  if(ok)body.push(h('div',null,'Erteilt am '+fmtDate(l.at)+(l.name?' von '+l.name:'')+' ('+(l.quelle||'')+').'));
+  else if(l.given&&l.widerrufenAm)body.push(h('div',null,'Widerrufen am '+fmtDate(l.widerrufenAm)+'. Keine Weitergabe mehr.'));
+  else body.push(h('div',{class:'eyebrow'},'Nicht erteilt. Kontaktdaten werden nicht weitergegeben.'));
+  if(ok)body.push(S.confirm==='wid'+c.id?h('div',{class:'confirm'},'Widerruf erfassen? Der Kunde erscheint dann nicht mehr bei den Leads.',h('button',{type:'button',class:'btn danger',onclick:()=>{saveCust(c.id,{leadConsent:{widerrufenAm:new Date().toISOString(),widerrufBy:(S.me&&S.me.email)||''}},0);S.confirm=null;toast('Widerruf erfasst');render._force=true;render();}},'Widerruf erfassen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
+    :h('button',{type:'button',class:'btn',style:'align-self:flex-start',onclick:()=>{S.confirm='wid'+c.id;render();}},'Widerruf erfassen'));
+  else if(isAdmin())body.push(S.confirm==='nach'+c.id?h('form',{class:'grid2',style:'align-items:end',onsubmit:e=>{e.preventDefault();const n=document.getElementById('lc-nw').value.trim(),nm=document.getElementById('lc-nm').value.trim();if(n.length<5||!nm){toast('Bitte Name und Nachweis eintragen.');return;}saveCust(c.id,{leadConsent:{given:true,at:new Date().toISOString(),text:LEAD_TEXT,name:nm,by:(S.me&&S.me.email)||'',quelle:'Nachweis: '+n,widerrufenAm:null}},0);S.confirm=null;toast('Einwilligung erfasst');render._force=true;render();}},
+      h('div',{class:'field'},h('label',{for:'lc-nm'},'Name des Einwilligenden'),h('input',{type:'text',id:'lc-nm',value:c.ansprechpartner||''})),h('div',{class:'field'},h('label',{for:'lc-nw'},'Nachweis (z. B. „unterschriebenes Formular vom 03.11.2026“)'),h('input',{type:'text',id:'lc-nw'})),h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Speichern'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen')))
+    :h('button',{type:'button',class:'btn',style:'align-self:flex-start',onclick:()=>{S.confirm='nach'+c.id;render();}},'Schriftliche Einwilligung nachträglich erfassen'));
+  return h('div',{class:'card'},...body);
+}
 function viewUnterschrift(c){
   S.pads={};
   if(signed(c)){
@@ -562,6 +577,7 @@ function viewUnterschrift(c){
         h('div',{class:'card'},h('div',{class:'label'},'Kunde'),h('img',{class:'sigimg',src:sg.kunde.img,alt:'Unterschrift '+sg.kunde.name}),h('div',null,sg.kunde.name)),
         h('div',{class:'card'},h('div',{class:'label'},'ONLION'),h('img',{class:'sigimg',src:sg.onlion.img,alt:'Unterschrift '+sg.onlion.name}),h('div',null,sg.onlion.name))),
       h('div',{class:'card'},h('div',{class:'label'},'Prüfsumme (SHA-256) des unterschriebenen Inhalts'),h('div',{class:'mono'},sg.hash)),
+      consentCard(c),
       h('div',{class:'row'},reset,h('div',{class:'spacer'}),h('button',{type:'button',class:'btn primary',onclick:()=>{S.view='pdf';render();}},'Weiter: PDF'))];
   }
   const missing=[];
@@ -579,7 +595,8 @@ function viewUnterschrift(c){
     const fresh=cur()||c;
     const signedAt=new Date().toISOString();
     const hash=await sha256(canonical(fresh,{signedAt,ort,kunde:name}));
-    const up={signature:{kunde,onlion,ort,signedAt,hash,version:(c.history||[]).length+1}};const cs=crmOf(fresh).status||'neu';if(cs!=='verloren'&&(CRM_RANK[cs]||0)<CRM_RANK.unterschrieben)Object.assign(up,crmPatch(fresh,'unterschrieben'));
+    const up={signature:{kunde,onlion,ort,signedAt,hash,version:(c.history||[]).length+1}};
+    const lo=document.getElementById('lead-ok');if(lo&&lo.checked)up.leadConsent={given:true,at:signedAt,text:LEAD_TEXT,name,by:(S.me&&S.me.email)||'',quelle:'Unterschrift',widerrufenAm:null};const cs=crmOf(fresh).status||'neu';if(cs!=='verloren'&&(CRM_RANK[cs]||0)<CRM_RANK.unterschrieben)Object.assign(up,crmPatch(fresh,'unterschrieben'));
     try{await S.db.doc('customers/'+c.id).update(up);toast('Unterschrieben');}
     catch(err){toast('Nicht gespeichert: '+(err&&err.message||err));e.target.disabled=false;}
   }},'Verbindlich unterschreiben');
@@ -593,6 +610,8 @@ function viewUnterschrift(c){
     h('div',{class:'grid2'},
       h('div',{class:'card'},h('div',{class:'label'},'Unterschrift Kunde'),makePad('kunde')),
       h('div',{class:'card'},h('div',{class:'label'},'Unterschrift ONLION'),makePad('onlion'))),
+    h('div',{class:'card'},h('div',{class:'label'},'Freiwillige Einwilligung (optional, unabhängig vom Vertrag)'),
+      h('label',{class:'check'},h('input',{type:'checkbox',id:'lead-ok'}),h('span',null,LEAD_TEXT))),
     h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>{S.view='datenschutz';render();}},'Zurück'),h('div',{class:'spacer'}),signBtn)];
 }
 
@@ -710,6 +729,7 @@ async function buildPdf(c){
     lines(wrap(T(sg.ort)+', '+fmtDate(sg.signedAt),9.5,'normal'),9.5,'normal',INK,M,2);
     lines(wrap('Prüfsumme SHA-256: '+sg.hash,7,'normal'),7,'normal',MUT,M,1);
     lines(wrap('Die Prüfsumme belegt, dass der Inhalt seit der Unterschrift nicht verändert wurde.',7,'normal'),7,'normal',MUT,M,1);
+    if(leadOk(c)){y+=3;lines(wrap('Freiwillige Einwilligung Weitergabe Kontaktdaten (erteilt am '+fmtDate(c.leadConsent.at)+'):',8,'bold'),8,'bold',INK,M,1);lines(wrap(c.leadConsent.text||LEAD_TEXT,7.5,'normal'),7.5,'normal',MUT,M,1);}
   } else lines(wrap('Noch nicht unterschrieben.',10,'italic'),10,'italic',MUT,M,2);
 
   const pages=doc.getNumberOfPages();
@@ -1295,11 +1315,11 @@ function viewProvisionenPartner(){
 }
 function viewVertriebAdmin(){
   const tab=S.vtab||'partner';
-  const tabs=h('div',{class:'chips',role:'tablist'},...[['partner','Partner'],['modell','Provisionsmodell'],['zahlungen','Zahlungen'],['abrechnung','Abrechnung']].map(([k,t])=>h('button',{type:'button',role:'tab','aria-selected':tab===k?'true':'false',class:'chip'+(tab===k?' on':''),onclick:()=>{S.vtab=k;S.confirm=null;render();}},t+(k==='partner'&&S.vorschl.filter(x=>x.status!=='erledigt').length?' ('+S.vorschl.filter(x=>x.status!=='erledigt').length+' neu)':''))));
+  const tabs=h('div',{class:'chips',role:'tablist'},...[['partner','Partner'],['modell','Provisionsmodell'],['zahlungen','Zahlungen'],['abrechnung','Abrechnung'],['leads','Leads']].map(([k,t])=>h('button',{type:'button',role:'tab','aria-selected':tab===k?'true':'false',class:'chip'+(tab===k?' on':''),onclick:()=>{S.vtab=k;S.confirm=null;render();}},t+(k==='partner'&&S.vorschl.filter(x=>x.status!=='erledigt').length?' ('+S.vorschl.filter(x=>x.status!=='erledigt').length+' neu)':''))));
   const all=S.prov.filter(r=>r.status!=='storniert');const k=provKpis(all);
   const umsatz=r2(S.zahl.filter(z=>!z.storniert).reduce((s,z)=>s+z.netto,0));const provSum=r2(all.reduce((s,r)=>s+r.betrag,0));
   const kpis=h('div',{class:'kpis'},kpiTile('Aktive Partner',String(partners().filter(p=>p.status!=='inaktiv').length),partners().length+' gesamt'),kpiTile('Zahlungseingang',eur0(umsatz),'netto, alle Kunden'),kpiTile('Provisionen',eur0(provSum),umsatz?Math.round(provSum/umsatz*100)+' % vom Umsatz':'–'),kpiTile('Deine Marge',eur0(umsatz-provSum),'nach Provisionen',true),kpiTile('Offen',eur0(k.offen),'noch auszuzahlen'),kpiTile('Ausgezahlt',eur0(k.aus),'gesamt'));
-  const body=({partner:vtPartner,modell:vtModell,zahlungen:vtZahlungen,abrechnung:vtAbrechnung}[tab]||vtPartner)();
+  const body=({partner:vtPartner,modell:vtModell,zahlungen:vtZahlungen,abrechnung:vtAbrechnung,leads:vtLeads}[tab]||vtPartner)();
   return [h('div',null,h('div',{class:'eyebrow'},'Überblick'),h('h1',null,'Vertrieb')),kpis,tabs].concat(body);
 }
 function vtPartner(){
@@ -1409,6 +1429,42 @@ function vtModell(){
   // Absender
   const ab=Object.assign({},c.absender);
   out.push(h('section',{class:'card'},h('h2',null,'Absender auf Gutschriften'),h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'ab-n'},'Name'),h('input',{type:'text',id:'ab-n',value:ab.name||'',oninput:e=>ab.name=e.target.value})),h('div',{class:'field'},h('label',{for:'ab-s'},'Steuer-Nr. / USt-ID'),h('input',{type:'text',id:'ab-s',value:ab.steuer||'',oninput:e=>ab.steuer=e.target.value}))),h('div',{class:'field'},h('label',{for:'ab-a'},'Anschrift'),h('input',{type:'text',id:'ab-a',value:ab.adresse||'',oninput:e=>ab.adresse=e.target.value})),h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async()=>{await saveCfg({absender:ab});toast('Absender gespeichert');}},'Speichern'))));
+  return out;
+}
+function csvCell(v){const s=String(v==null?'':v).replace(/\r?\n/g,' ');return /[";,]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+function vtLeads(){
+  const out=[];const all=S.customers.filter(leadOk);
+  const brs=[...new Set(all.map(c=>(c.branche||'').trim()).filter(Boolean))].sort();
+  const fb=S.leadBr||'';const list=all.filter(c=>!fb||(c.branche||'').trim()===fb);
+  S.leadSel=S.leadSel||new Set();
+  const sold=id=>S.leadsales.filter(v=>(v.customerIds||[]).includes(id));
+  const rows=h('div',{class:'dlist'});
+  if(!list.length)rows.append(h('div',{class:'eyebrow'},all.length?'Keine Leads in dieser Branche.':'Noch keine Kunden mit Einwilligung. Die Einwilligung wird freiwillig bei der Unterschrift erteilt.'));
+  for(const c of list){const n=sold(c.id).length;
+    rows.append(h('label',{class:'check member'},h('input',{type:'checkbox',checked:S.leadSel.has(c.id),onchange:e=>{e.target.checked?S.leadSel.add(c.id):S.leadSel.delete(c.id);}}),h('span',{class:'who'},h('strong',null,c.firma||'Ohne Namen'),' · '+(c.branche||'Branche fehlt')+(c.adresse?' · '+c.adresse:''),h('div',{class:'eyebrow'},'Einwilligung '+fmtDay(String(c.leadConsent.at).slice(0,10)).replace(/^\w+\.,\s*/,'')+(n?' · '+n+'× weitergegeben':'')))));}
+  const st=h('div',{class:'banner warn',hidden:true});
+  out.push(h('section',{class:'card'},h('h2',null,'Leads mit Einwilligung'),
+    h('p',{class:'eyebrow',style:'margin:0'},'Nur Kunden mit freiwilliger, nicht widerrufener Einwilligung. Weitergegeben werden nur Firmen- und Kontaktdaten, niemals Anruferdaten aus dem Telefon-Agenten oder Inhalte aus dem Fragenkatalog. Jede Weitergabe wird protokolliert.'),
+    h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'ld-br'},'Branche'),h('select',{id:'ld-br',onchange:e=>{S.leadBr=e.target.value;render._force=true;render();}},h('option',{value:''},'Alle Branchen ('+all.length+')'),...brs.map(b=>{const o=h('option',{value:b},b+' ('+all.filter(c=>(c.branche||'').trim()===b).length+')');if(fb===b)o.selected=true;return o;})))),
+    list.length?h('button',{type:'button',class:'linkbtn',onclick:()=>{for(const c of list)S.leadSel.add(c.id);render._force=true;render();}},'Alle auswählen'):null,rows));
+  out.push(h('form',{class:'card',onsubmit:async e=>{
+    e.preventDefault();const ids=[...S.leadSel].filter(id=>all.some(c=>c.id===id));
+    const k=document.getElementById('ld-k').value.trim(),pr=parseFloat(document.getElementById('ld-p').value)||0,zw=document.getElementById('ld-z').value.trim();
+    if(!ids.length){st.textContent='Bitte zuerst Leads auswählen.';st.hidden=false;return;}
+    if(k.length<2){st.textContent='Bitte den Käufer eintragen.';st.hidden=false;return;}
+    const sel=all.filter(c=>ids.includes(c.id));
+    const v={id:uid(),kaeufer:k,zweck:zw,preisJeLead:r2(pr),summe:r2(pr*sel.length),anzahl:sel.length,customerIds:ids,datum:todayStr(),at:new Date().toISOString(),by:(S.me&&S.me.email)||''};
+    await S.db.doc('leadverkaeufe/'+v.id).set(v);S.leadsales=S.leadsales.concat([v]);
+    const head=['Firma','Branche','Anschrift','Ansprechpartner','E-Mail','Telefon','Einwilligung erteilt am'];
+    const csv='﻿'+[head].concat(sel.map(c=>[c.firma,c.branche,c.adresse,c.ansprechpartner,c.email,c.telefon,fmtDate(c.leadConsent.at)])).map(r=>r.map(csvCell).join(';')).join('\r\n');
+    await S.dl.save({filename:'ONLION_Leads_'+todayStr()+'_'+k.replace(/[^\wäöüÄÖÜß-]+/g,'_')+'.csv',data:new Blob([csv],{type:'text/csv;charset=utf-8'})});
+    S.leadSel=new Set();toast(sel.length+' Leads exportiert und protokolliert');render._force=true;render();
+  }},h('h2',null,'Weitergabe erfassen und exportieren'),
+    h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'ld-k'},'Käufer / Empfänger'),h('input',{type:'text',id:'ld-k'})),h('div',{class:'field'},h('label',{for:'ld-p'},'Preis je Lead netto (€)'),h('input',{type:'number',id:'ld-p',min:'0',step:'1',inputmode:'decimal'})),h('div',{class:'field'},h('label',{for:'ld-z'},'Zweck (optional)'),h('input',{type:'text',id:'ld-z',placeholder:'z. B. Angebot Telefonanlagen'}))),
+    st,h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Exportieren (CSV) und protokollieren'))));
+  const hist=S.leadsales.slice().sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+  out.push(h('section',{class:'card'},h('h2',null,'Protokoll der Weitergaben'),hist.length?h('div',{class:'dlist'},...hist.map(v=>h('div',{class:'member'},h('div',{class:'who'},h('strong',null,v.kaeufer),' · '+fmtDay(v.datum).replace(/^\w+\.,\s*/,'')+' · '+v.anzahl+' Leads',h('div',{class:'eyebrow'},(v.zweck?v.zweck+' · ':'')+'durch '+v.by)),h('strong',null,eur(v.summe))))):h('div',{class:'eyebrow'},'Noch keine Weitergaben.'),
+    h('div',{class:'eyebrow'},'Summe Lead-Erlöse: '+eur(r2(hist.reduce((s,v)=>s+(v.summe||0),0))))));
   return out;
 }
 function vtZahlungen(){
@@ -1694,7 +1750,7 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.s
   db.doc('config/provision').onSnapshot(sn=>{S.cfg=sn.exists?sn.data():null;},()=>{});
   if(isAdmin())db.doc('intern/kosten').onSnapshot(sn=>{S.kosten=sn.exists?sn.data():null;},()=>{});
   sub('provisionen','prov');sub('gutschriften','gs');sub('vorschlaege','vorschl');
-  if(isAdmin())sub('zahlungen','zahl');
+  if(isAdmin()){sub('zahlungen','zahl');sub('leadverkaeufe','leadsales');}
   else sb.rpc('my_structure').then(({data})=>{S.struct=data||[];});
   db.collection('customers').orderBy('createdAt','desc').onSnapshot(snap=>{
     S.customers=snap.docs.map(d=>Object.assign({id:d.id},d.data()));S.loaded=true;

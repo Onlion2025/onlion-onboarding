@@ -100,11 +100,32 @@ try:
             for i in range(20): page.mouse.move(bb['x'] + 30 + i * 12, bb['y'] + 100 - (i % 5) * 10)
             page.mouse.up()
         ok('Unterschreiben-Knopf aktiv', page.is_enabled('#signBtn'))
+        page.check('#lead-ok')
         page.click('#signBtn'); page.wait_for_selector('text=Prüfsumme (SHA-256)')
         cust = page.evaluate("()=>[...__rows.values()].find(r=>r.collection==='customers').data")
         sig = cust.get('signature') or {}
         ok('Unterschrift mit Hash gespeichert', len(sig.get('hash', '')) == 64 and sig.get('ort') == 'Ansbach' and sig['kunde']['img'].startswith('data:image/png'))
         page.screenshot(path=T + '/5-unterschrift.png')
+        ok('Einwilligung mit Text und Zeit gespeichert', (cust.get('leadConsent') or {}).get('given') is True and 'widerrufen' in cust['leadConsent']['text'])
+        page.fill('#s-br', 'Immobilien') if page.is_visible('#s-br') and page.is_enabled('#s-br') else None
+        # Leads exportieren
+        page.evaluate("()=>{const r=[...__rows.values()].find(r=>r.collection==='customers');r.data.branche='Immobilien';}")
+        page.click('#navVertrieb'); page.click('.chip:has-text("Leads")'); page.wait_for_selector('#ld-k')
+        ok('Lead-Liste zeigt Kunden mit Einwilligung', 'Test GmbH' in page.inner_text('#view'))
+        page.click('button:has-text("Alle auswählen")'); page.fill('#ld-k', 'Telefonanlagen Müller'); page.fill('#ld-p', '40')
+        with page.expect_download() as d:
+            page.click('button:has-text("Exportieren (CSV) und protokollieren")')
+        csvp = T + '/leads.csv'; d.value.save_as(csvp); csv = open(csvp, encoding='utf-8-sig').read()
+        ok('CSV mit Stammdaten, ohne Antworten', 'Test GmbH' in csv and 'Max Muster' in csv and 'Verpasste Anrufe' not in csv)
+        sales = page.evaluate("()=>[...__rows.values()].filter(r=>r.collection==='leadverkaeufe').map(r=>r.data)")
+        ok('Weitergabe protokolliert', len(sales) == 1 and sales[0]['kaeufer'] == 'Telefonanlagen Müller' and sales[0]['summe'] == 40)
+        page.screenshot(path=T + '/l-leads.png', full_page=True)
+        # Widerruf
+        page.click('#custList .navbtn:has-text("Test GmbH")'); page.click('nav >> text=Unterschrift'); page.wait_for_selector('text=Einwilligung Weitergabe')
+        page.click('button:has-text("Widerruf erfassen")'); page.click('.confirm >> button:has-text("Widerruf erfassen")'); page.wait_for_timeout(500)
+        page.click('#navVertrieb'); page.click('.chip:has-text("Leads")'); page.wait_for_selector('#ld-k')
+        ok('Nach Widerruf kein Lead mehr', 'Noch keine Kunden mit Einwilligung' in page.inner_text('#view'))
+        page.click('#custList .navbtn:has-text("Test GmbH")'); page.wait_for_timeout(200)
         page.click('nav >> text=Fragenkatalog'); page.click('.chip:has-text("Ziel und Erfolg")'); page.wait_for_selector('#q-q01')
         ok('Nach Unterschrift gesperrt', page.is_disabled('#q-q01'))
         page.click('nav >> text=PDF')
