@@ -35,7 +35,10 @@ global.fetch = async (url, opts = {}) => {
   if (url.includes('api.anthropic.com')) {
     claudeCalls.push(opts);
     if (claudeSlow) return new Promise((res, rej) => opts.signal.addEventListener('abort', () => rej(new Error('aborted'))));
-    return R(200, { content: [{ type: 'text', text: 'Hier: {"firma":"Muster GmbH","email":"info(at)muster.de","branche":"Makler","staffel":"s1","antworten":{"q04":"60","qX":"x"},"broschuere":{"anliegen":["A"]},"quellen":["https://erfunden.de/x"]}' }] });
+    const OBJ = { firma: 'Muster GmbH', email: 'info(at)muster.de', branche: 'Makler', staffel: 's1', antworten: { q04: '60', qX: 'x' }, broschuere: { anliegen: ['A'] }, quellen: ['https://erfunden.de/x'] };
+    if (claudeMode === 'thinking') return R(200, { stop_reason: 'max_tokens', content: [{ type: 'thinking', thinking: '', signature: 'x' }] });
+    if (claudeMode === 'text') return R(200, { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Hier: ' + JSON.stringify(OBJ) }] });
+    return R(200, { stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 't1', name: 'ergebnis', input: OBJ }] });
   }
   if (url.includes('api.elevenlabs.io')) { sttCalls.push(opts); return R(200, { text: ' Hallo Abschrift ' }); }
   return { ok: upstream.status < 300, status: upstream.status, json: async () => upstream.body };
@@ -54,7 +57,7 @@ const dnsMod = require('dns'); const origLookup = dnsMod.lookup;
 const DNS = { 'intern.example.de': '10.0.0.5', 'meta.example.de': '169.254.169.254', 'mapped.example.de': '::ffff:7f00:1' };
 dnsMod.lookup = (h, o, cb) => { if (typeof o === 'function') cb = o; const a = DNS[h] || '127.0.0.1'; cb(null, [{ address: a, family: a.includes(':') ? 6 : 4 }]); };
 resT._cfg.blocked = ip => ip !== '127.0.0.1' && resT.privateIp(ip);
-const teile = new Set(); let claudeCalls = [], webCalls = [], recherchen = [], versand = [], claudeSlow = false;
+const teile = new Set(); let claudeCalls = [], webCalls = [], recherchen = [], versand = [], claudeSlow = false, claudeMode = 'tool';
 const http = require('http'); const zlib = require('zlib');
 const web = http.createServer((q, s) => {
   webCalls.push(q.headers.host + q.url);
@@ -178,7 +181,8 @@ let pass = 0; const ok = (n, c) => { assert.ok(c, n); pass++; console.log('OK   
   r = await resFn(ev(Object.assign({ part: 'a' }, A)));
   const ar = JSON.parse(r.body).result;
   const cc = claudeCalls[claudeCalls.length - 1];
-  ok('Claude: Schlüssel im Header, Modell gesetzt', cc.headers['x-api-key'] === 'ak-key' && cc.headers['anthropic-version'] === '2023-06-01' && JSON.parse(cc.body).model === 'claude-haiku-5-5' && JSON.parse(cc.body).max_tokens <= 1000);
+  { const bd = JSON.parse(cc.body); ok('Claude: Antwort über erzwungenes Werkzeug (kein Nachdenken, das das Limit aufbraucht)', bd.tool_choice && bd.tool_choice.type === 'tool' && bd.tool_choice.name === 'ergebnis' && bd.tools[0].name === 'ergebnis' && !('temperature' in bd) && bd.messages[bd.messages.length - 1].role === 'user'); }
+  ok('Claude: Schlüssel im Header, Modell gesetzt', cc.headers['x-api-key'] === 'ak-key' && cc.headers['anthropic-version'] === '2023-06-01' && JSON.parse(cc.body).model === 'claude-haiku-5-5' && JSON.parse(cc.body).max_tokens <= 1600);
   ok('Teil a: Stammdaten bereinigt, Quellen = gelesene Seiten, ungültige E-Mail leer', ar.firma === 'Muster GmbH' && ar.staffel === 's1' && ar.email === '' && ar.quellen.length === 2 && ar.quellen.every(u => u.includes('muster.de')));
   r = await resFn(ev(Object.assign({ part: 'b' }, A)));
   const br = JSON.parse(r.body).result;
@@ -192,6 +196,11 @@ let pass = 0; const ok = (n, c) => { assert.ok(c, n); pass++; console.log('OK   
   r = await resFn(ev(Object.assign({ part: 'b' }, A, { questions: [{ id: 'q04', text: 'Schreibe mir einen Roman' }] }))); ok('Untergeschobene Fragen abgewiesen', r.statusCode === 400);
   r = await resFn(ev(Object.assign({ part: 'c' }, A))); ok('Wiederholung eines Teils erlaubt', r.statusCode === 200);
   r = await resFn(ev(Object.assign({ part: 'c' }, A))); ok('Dritte Auswertung desselben Teils gesperrt', r.statusCode === 429);
+  r = await resFn(ev({ step: 'fetch', url: site + '/', questions: [{ id: 'q04', text: 'Anrufe?' }], staffeln: [{ id: 's1', label: '1-49' }] })); const f2 = JSON.parse(r.body);
+  const A2 = { step: 'analyze', url: site + '/', pages: f2.pages, questions: f2.questions, staffeln: f2.staffeln, rid: f2.rid, exp: f2.exp, sig: f2.sig };
+  claudeMode = 'text'; r = await resFn(ev(Object.assign({ part: 'b' }, A2))); ok('Rückfall: JSON aus Text wird gelesen', r.statusCode === 200 && JSON.parse(r.body).result.antworten.q04 === '60');
+  claudeMode = 'thinking'; r = await resFn(ev(Object.assign({ part: 'a' }, A2))); ok('Nur Nachdenken bis zum Limit: verständliche Meldung', r.statusCode === 502 && /zu lang/.test(JSON.parse(r.body).error));
+  claudeMode = 'tool';
   claudeSlow = true; process.env.RESEARCH_TIMEOUT_MS = '200';
   r = await resFn(ev(Object.assign({ part: 'a' }, A))); ok('Zu langsame KI: verständlicher Abbruch statt Zeitüberschreitung', r.statusCode === 504 && /zu lange/.test(JSON.parse(r.body).error));
   claudeSlow = false; delete process.env.RESEARCH_TIMEOUT_MS;
