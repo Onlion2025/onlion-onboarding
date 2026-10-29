@@ -56,6 +56,11 @@
   const hp = new URLSearchParams(location.hash.replace(/^#/, ''));
   if (hp.get('access_token')) { session = {user:{email: hp.get('mock_email')}, access_token: 'tok'}; keep(); }
   window.supabase = { createClient(){ return {
+    storage: { from(bucket){ return {
+      async upload(path, blob, opts){ (window.__files = window.__files || {})[bucket + '/' + path] = {size: blob.size, type: (opts||{}).contentType}; return {data:{path}, error:null}; },
+      async createSignedUrl(path){ return {data:{signedUrl:'data:audio/webm;base64,GkXfo0AgQoaBAULygQRC84EIQoKEd2VibUKHgQRChYEC'}, error:null}; },
+      async remove(paths){ for (const p of paths) delete (window.__files||{})[bucket + '/' + p]; return {data:null, error:null}; }
+    }; } },
     from: q,
     rpc(name){ return Promise.resolve({data: name === 'my_structure' ? (window.__struct || []) : null, error: null}); },
     channel(){ return { on(){ return this; }, subscribe(){ return this; } }; },

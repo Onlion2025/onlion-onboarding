@@ -10,8 +10,15 @@ create table public.docs (collection text not null, id text not null, data jsonb
 alter table public.docs enable row level security;
 grant select, insert, update, delete on public.docs to authenticated;`);
 await ex(fs.readFileSync(R + 'team.sql', 'utf8'));
+await ex(`create schema storage;
+create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint);
+create table storage.objects (bucket_id text, name text, primary key (bucket_id, name));
+alter table storage.objects enable row level security;
+create function storage.foldername(name text) returns text[] language sql immutable as $f$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'),1)-1] $f$;
+grant usage on schema storage to authenticated; grant select, insert, delete on storage.objects to authenticated; grant execute on function storage.foldername(text) to authenticated;`);
 await ex(`grant select, update on public.team to authenticated;`);  // wie Supabase-Standard; vertrieb.sql schränkt ein
 const v = await db.exec(fs.readFileSync(R + 'vertrieb.sql', 'utf8'));
+await ex(fs.readFileSync(R + 'sprachnotizen.sql', 'utf8'));
 console.log('Policies:', v.at(-1).rows.map(r => r.tablename + ':' + r.policyname).join(' | '));
 // Daten
 await ex(`insert into team(email,role) values ('marc@x.de','member');
@@ -78,9 +85,22 @@ await as('fremd@x.de', async () => {
   ok('Fremdes Konto: Struktur leer', (await q(`select * from my_structure()`)).length === 0);
 });
 ok('Werber mit Struktur nicht löschbar', !(await tryq(`delete from team where email='p2@x.de'`)));
+// Sprachnotizen-Speicher
+await ex(`insert into storage.objects values ('sprachnotizen','a/n1.webm'),('sprachnotizen','b/n2.webm'),('sprachnotizen','c/n3.webm')`);
+await as('p1@x.de', async () => {
+  const o = await q(`select name from storage.objects`);
+  ok('Partner sieht nur Notizen eigener Kunden', o.length === 1 && o[0].name === 'a/n1.webm');
+  ok('Partner kann bei eigenem Kunden hochladen', await tryq(`insert into storage.objects values ('sprachnotizen','a/n4.webm')`));
+  ok('Partner kann nicht bei fremdem Kunden hochladen', !(await tryq(`insert into storage.objects values ('sprachnotizen','b/n5.webm')`)));
+  ok('Partner kann fremde Notiz nicht löschen', (await q(`delete from storage.objects where name='b/n2.webm' returning name`)).length === 0);
+});
+await as('onlion-@outlook.de', async () => { ok('ONLION sieht alle Notizen', (await q(`select name from storage.objects`)).length === 4); });
+await as('fremd@x.de', async () => { ok('Fremde sehen keine Notizen', (await q(`select name from storage.objects`)).length === 0); });
+await as('weg@x.de', async () => { ok('Inaktiver Partner sieht keine Notizen', (await q(`select name from storage.objects`)).length === 0); });
 // Zyklus-Schutz: sponsor kann nicht man selbst sein
 ok('Partner kann nicht sein eigener Werber sein', !(await tryq(`update team set sponsor='p1@x.de' where email='p1@x.de'`)));
 // SQL zweimal ausführbar
 ok('vertrieb.sql mehrfach ausführbar', await db.exec(fs.readFileSync(R + 'vertrieb.sql', 'utf8')).then(() => true, e => (console.log(e.message), false)));
+ok('sprachnotizen.sql mehrfach ausführbar', await db.exec(fs.readFileSync(R + 'sprachnotizen.sql', 'utf8')).then(() => true, e => (console.log(e.message), false)));
 console.log(`\n${pass}/${pass + fail} Zugriffstests bestanden`);
 process.exit(fail ? 1 : 0);

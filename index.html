@@ -836,6 +836,55 @@ function viewVorlagen(){
 }
 
 /* ---------- CRM ---------- */
+/* ---------- Sprachnotizen ---------- */
+const REC_MAX=300;
+function recSupported(){return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);}
+async function recStart(c){
+  if(!recSupported()){toast('Aufnahme wird von diesem Browser nicht unterstützt.');return;}
+  if(S.rec){toast('Es läuft bereits eine Aufnahme.');return;}
+  let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:true});}catch(e){toast('Kein Zugriff auf das Mikrofon. Bitte in den Einstellungen erlauben.');return;}
+  const mime=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/aac'].find(t=>{try{return MediaRecorder.isTypeSupported(t);}catch(e){return false;}})||'';
+  const mr=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);const chunks=[];
+  mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+  const rec={cid:c.id,mr,stream,start:Date.now(),timer:null};S.rec=rec;
+  mr.onstop=()=>{clearInterval(rec.timer);stream.getTracks().forEach(t=>t.stop());const type=(mr.mimeType||mime||'audio/webm').split(';')[0];const blob=new Blob(chunks,{type});const secs=Math.round((Date.now()-rec.start)/1000);S.rec=null;render._force=true;render();if(blob.size<200){toast('Aufnahme zu kurz.');return;}recSave(c,blob,type,secs);};
+  rec.timer=setInterval(()=>{const s=Math.round((Date.now()-rec.start)/1000);const el=document.getElementById('rec-time');if(el)el.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');if(s>=REC_MAX&&mr.state==='recording')mr.stop();},500);
+  mr.start(1000);render._force=true;render();
+}
+function recStop(){if(S.rec&&S.rec.mr.state==='recording')S.rec.mr.stop();}
+async function recSave(c,blob,type,secs){
+  const ext=/mp4|aac|m4a/.test(type)?'mp4':/ogg/.test(type)?'ogg':'webm';
+  const id=uid();const path=c.id+'/'+id+'.'+ext;
+  S.recBusy=c.id;render._force=true;render();
+  try{
+    const {error}=await S.sb.storage.from('sprachnotizen').upload(path,blob,{contentType:type,upsert:false});
+    if(error)throw new Error(/bucket|not found/i.test(error.message||'')?'Speicher für Sprachnotizen fehlt (supabase/sprachnotizen.sql).':error.message);
+    const entry={id,at:new Date().toISOString(),by:(S.me&&S.me.email)||'',type:'Sprachnotiz',text:'Abschrift läuft …',audio:path,dauer:secs};
+    saveCust(c.id,{crm:{log:[entry].concat(crmOf(cur()||c).log||[])}},0);
+    await recTranscribe(c,entry);
+  }catch(e){toast('Sprachnotiz nicht gespeichert: '+e.message);}
+  finally{S.recBusy=null;render._force=true;render();}
+}
+async function recTranscribe(c,entry){
+  let text='',err=false;
+  try{const r=await callFn('transcribe',{customerId:c.id,path:entry.audio});text=String(r.text||'').trim()||'(Keine Sprache erkannt)';}
+  catch(e){err=true;text='(Abschrift nicht möglich: '+e.message+')';}
+  const upd=Object.assign({},entry,{text,sttError:err});
+  saveCust(c.id,{crm:{log:[upd].concat((crmOf(cur()||c).log||[]).filter(x=>x.id!==entry.id))}},0);
+  toast(err?'Aufnahme gespeichert, Abschrift fehlgeschlagen':'Sprachnotiz gespeichert');
+}
+async function recPlay(e){
+  try{const {data,error}=await S.sb.storage.from('sprachnotizen').createSignedUrl(e.audio,600);if(error)throw error;(S.audioUrls=S.audioUrls||{})[e.id]=data.signedUrl;render._force=true;render();}
+  catch(x){toast('Aufnahme nicht abrufbar.');}
+}
+function recControls(c){
+  const busy=S.recBusy===c.id,rec=S.rec&&S.rec.cid===c.id;
+  return h('div',{class:'field'},
+    h('div',{class:'row',style:'gap:10px'},
+      rec?h('button',{type:'button',class:'btn danger',id:'rec-stop',onclick:recStop},'■ Aufnahme beenden'):h('button',{type:'button',class:'btn',id:'rec-start',disabled:busy||!!S.rec,onclick:()=>recStart(c)},busy?'Sprachnotiz wird verarbeitet …':'🎙 Sprachnotiz aufnehmen'),
+      rec?h('span',{class:'tabnum',style:'font-weight:700;color:#b42318'},'● ',h('span',{id:'rec-time'},'0:00'),' / 5:00'):null),
+    h('div',{class:'eyebrow'},'Für eigene Notizen nach dem Gespräch. Gespräche nicht ohne Zustimmung aller Beteiligten mitschneiden (§ 201 StGB). Die Abschrift erstellt ElevenLabs.'));
+}
 function crmCard(c){
   const cr=crmOf(c),cs=stat(c);
   const chips=h('div',{class:'chips',role:'group','aria-label':'Status'});
@@ -869,9 +918,12 @@ function crmCard(c){
   for(const e of entries.slice(0,S.logAll===c.id?999:5)){
     const k=lk(e);
     log.append(h('div',{class:'logi'},h('div',{class:'lm row',style:'gap:8px'},h('span',null,fmtDate(e.at)+' · '+e.type+(e.by?' · '+e.by:'')),h('span',{class:'spacer'}),
-      S.confirm==='log:'+k?h('span',{class:'row',style:'gap:6px'},h('button',{type:'button',class:'linkbtn',style:'color:#b42318',onclick:()=>{saveCust(c.id,{crm:{logDel:(crmOf(cur()||c).logDel||[]).concat([k])}},0);S.confirm=null;toast('Eintrag gelöscht');render();}},'Löschen bestätigen'),h('button',{type:'button',class:'linkbtn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
+      S.confirm==='log:'+k?h('span',{class:'row',style:'gap:6px'},h('button',{type:'button',class:'linkbtn',style:'color:#b42318',onclick:()=>{if(e.audio&&S.sb)S.sb.storage.from('sprachnotizen').remove([e.audio]).catch(()=>{});saveCust(c.id,{crm:{logDel:(crmOf(cur()||c).logDel||[]).concat([k])}},0);S.confirm=null;toast('Eintrag gelöscht');render();}},'Löschen bestätigen'),h('button',{type:'button',class:'linkbtn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
         :h('button',{type:'button',class:'linkbtn','aria-label':'Eintrag löschen',onclick:()=>{S.confirm='log:'+k;render();}},'Löschen')),
-      h('div',{style:'white-space:pre-wrap;overflow-wrap:anywhere'},e.text)));
+      h('div',{style:'white-space:pre-wrap;overflow-wrap:anywhere'},e.text),
+      e.audio?h('div',{class:'row',style:'gap:10px;margin-top:6px'},
+        S.audioUrls&&S.audioUrls[e.id]?h('audio',{controls:true,src:S.audioUrls[e.id],style:'max-width:100%'}):h('button',{type:'button',class:'linkbtn',onclick:()=>recPlay(e)},'▶ Anhören'+(e.dauer?' ('+Math.floor(e.dauer/60)+':'+String(e.dauer%60).padStart(2,'0')+')':'')),
+        e.sttError?h('button',{type:'button',class:'linkbtn',onclick:async()=>{await recTranscribe(c,e);render._force=true;render();}},'Abschrift erneut versuchen'):null):null));
   }
   if(entries.length>5&&S.logAll!==c.id)log.append(h('button',{type:'button',class:'linkbtn',onclick:()=>{S.logAll=c.id;render._force=true;render();}},'Alle '+entries.length+' Einträge zeigen'));
   const hist=(cr.history||[]).slice(-1)[0];
@@ -881,6 +933,7 @@ function crmCard(c){
     S.confirm==='abg'+c.id?h('div',{class:'confirm'},'Diese Akte ist noch nicht unterschrieben. Trotzdem als „Abgeschlossen“ markieren?',h('button',{type:'button',class:'btn primary',onclick:()=>{S.confirm=null;saveCust(c.id,crmPatch(c,'abgeschlossen'),0);toast('Status: Abgeschlossen');render();}},'Ja, abgeschlossen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen')):null,
     h('div',{class:'grid2'},fld('cr-termin','Termin',termin),fld('cr-wv','Wiedervorlage (nächster Kontakt)',wv),fld('cr-quelle','Quelle',qsel)),
     h('div',{class:'field'},h('label',{for:'cr-log'},'Gesprächsprotokoll'),tchips,ta),
+    recControls(c),
     h('div',{class:'row'},addLog,h('div',{class:'eyebrow'},'Ein „Anruf“ bei einem neuen Kunden setzt den Status auf „Angerufen“, ein Termin-Datum auf „Termin vereinbart“.')),
     entries.length?log:null);
 }

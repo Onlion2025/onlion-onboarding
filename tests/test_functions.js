@@ -3,6 +3,7 @@ const assert = require('assert');
 const path = '/home/claude/onlion-onboarding/netlify/functions/';
 let calls = []; let userMail = 'Adam@Onlion.de';
 let supaOk = true, upstream = { status: 201, body: { id: 'lx-123', messageId: '<m1>' } };
+let sttCalls = [];
 let team = [{ email: 'adam@onlion.de', role: 'owner', user_id: 'u1' }, { email: 'partner@x.de', role: 'member', user_id: 'u2' }];
 let existingUsers = ['adam@onlion.de'];
 const R = (status, body) => ({ ok: status < 300, status, json: async () => body });
@@ -25,15 +26,19 @@ global.fetch = async (url, opts = {}) => {
     return R(200, { id: 'uid-' + b.email, email: b.email, action_link: 'https://x.supabase.co/auth/v1/verify?token=T&type=' + b.type + '&redirect_to=' + b.redirect_to });
   }
   if (url.includes('/auth/v1/admin/users/')) return R(200, {});
+  if (url.includes('/rest/v1/docs')) { const m = /id=eq\.([^&]+)/.exec(url); return R(200, m && decodeURIComponent(m[1]) === 'kundeA' ? [{ data: { firma: 'A', partner: 'vp1@x.de' } }] : []); }
+  if (url.includes('/storage/v1/object/sprachnotizen/')) return { ok: !url.includes('fehlt'), status: url.includes('fehlt') ? 404 : 200, headers: { get: () => 'audio/webm' }, arrayBuffer: async () => new ArrayBuffer(1000) };
+  if (url.includes('api.elevenlabs.io')) { sttCalls.push(opts); return R(200, { text: ' Hallo Abschrift ' }); }
   return { ok: upstream.status < 300, status: upstream.status, json: async () => upstream.body };
 };
 Object.assign(process.env, {
   SUPABASE_URL: 'https://x.supabase.co', SUPABASE_ANON_KEY: 'anon', BREVO_API_KEY: 'bk', BREVO_SENDER_EMAIL: 'info@onlion.de',
-  OWNER_EMAIL: 'kopie@onlion.de', ALLOWED_USER_EMAIL: 'adam@onlion.de', SUPABASE_SERVICE_ROLE_KEY: 'srk', URL: 'https://kionboarding.netlify.app', RESET_MIN_MS: '0'
+  OWNER_EMAIL: 'kopie@onlion.de', ALLOWED_USER_EMAIL: 'adam@onlion.de', SUPABASE_SERVICE_ROLE_KEY: 'srk', ELEVENLABS_API_KEY: 'el-key', URL: 'https://kionboarding.netlify.app', RESET_MIN_MS: '0'
 });
 const send = require(path + 'send-pdf.js').handler;
 const teamFn = require(path + 'team.js').handler;
 const resetFn = require(path + 'reset-password.js').handler;
+const sttFn = require(path + 'transcribe.js').handler;
 const ev = (body, auth = 'Bearer tok') => ({ httpMethod: 'POST', headers: { authorization: auth }, body: JSON.stringify(body) });
 let pass = 0; const ok = (n, c) => { assert.ok(c, n); pass++; console.log('OK   ' + n); };
 
@@ -99,6 +104,21 @@ let pass = 0; const ok = (n, c) => { assert.ok(c, n); pass++; console.log('OK   
   r = await teamFn(ev({ action: 'invite', email: 'vp3@x.de', role: 'partner', sponsor: 'partner@x.de' })); ok('Werber muss Partner sein', r.statusCode === 400);
   r = await teamFn(ev({ action: 'remove', email: 'vp1@x.de' })); ok('Werber mit Struktur nicht entfernbar', r.statusCode === 400 && JSON.parse(r.body).error.includes('Struktur'));
   r = await teamFn(ev({ action: 'invite', email: 'admin2@x.de', role: 'owner' })); ok('Rolle owner nicht vergebbar', r.statusCode === 200 && team.find(t => t.email === 'admin2@x.de').role === 'member');
+
+
+  // Sprachnotiz-Abschrift
+  userMail = 'adam@onlion.de';
+  r = await sttFn(ev({ customerId: 'kundeA', path: 'kundeA/abc-123.webm' }));
+  ok('Abschrift für ONLION', r.statusCode === 200 && JSON.parse(r.body).text === 'Hallo Abschrift');
+  const so = sttCalls[sttCalls.length - 1];
+  ok('ElevenLabs-Schlüssel nur im Header', so.headers['xi-api-key'] === 'el-key' && so.body instanceof FormData && so.body.get('model_id') === 'scribe_v1' && so.body.get('language_code') === 'deu');
+  userMail = 'vp1@x.de'; r = await sttFn(ev({ customerId: 'kundeA', path: 'kundeA/abc-123.webm' })); ok('Partner: eigener Kunde erlaubt', r.statusCode === 200);
+  r = await sttFn(ev({ customerId: 'kundeB', path: 'kundeB/abc-123.webm' })); ok('Partner: fremder Kunde 403', r.statusCode === 403);
+  userMail = 'adam@onlion.de';
+  r = await sttFn(ev({ customerId: 'kundeA', path: 'kundeB/abc-123.webm' })); ok('Pfad muss zum Kunden passen', r.statusCode === 400);
+  r = await sttFn(ev({ customerId: 'kundeA', path: 'kundeA/../x.webm' })); ok('Pfad-Tricks abgewiesen', r.statusCode === 400);
+  r = await sttFn(ev({ customerId: 'kundeA', path: 'kundeA/fehlt.webm' })); ok('Fehlende Datei 404', r.statusCode === 404);
+  userMail = 'fremd@x.de'; r = await sttFn(ev({ customerId: 'kundeA', path: 'kundeA/abc.webm' })); ok('Fremde 401', r.statusCode === 401); userMail = 'adam@onlion.de';
 
   console.log('\n' + pass + ' Funktionstests bestanden');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

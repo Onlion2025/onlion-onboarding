@@ -26,7 +26,7 @@ def page_for(ctx, team, seed, fnlog=None):
     pg.route('https://fonts.googleapis.com/**', lambda r: r.abort())
     def fn(r):
         if fnlog is not None: fnlog.append((r.request.url, r.request.post_data))
-        r.fulfill(status=200, content_type='application/json', body='{"ok":true}')
+        r.fulfill(status=200, content_type='application/json', body='{"text":"Testabschrift Rückruf am Montag"}' if 'transcribe' in r.request.url else '{"ok":true}')
     pg.route('**/.netlify/functions/**', fn)
     pg.goto('http://localhost:8767/index.html'); pg.wait_for_selector('#loginForm')
     return pg
@@ -40,8 +40,8 @@ def new_customer(pg, name, partner):
     pg.click('button.mobile-back, nav >> text=Übersicht'); pg.wait_for_selector('#pay-amt')
 try:
     with sync_playwright() as p:
-        b = p.chromium.launch()
-        ctx = b.new_context(viewport={'width': 1194, 'height': 900}, accept_downloads=True, service_workers='block')
+        b = p.chromium.launch(args=['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'])
+        ctx = b.new_context(viewport={'width': 1194, 'height': 900}, accept_downloads=True, service_workers='block', permissions=['microphone'])
         fnlog = []
         a = page_for(ctx, TEAM, SEED, fnlog); login(a, 'adam@test.de')
         ok('Admin sieht „Vertrieb“', a.inner_text('#navVertrieb') == 'Vertrieb' and a.is_visible('#navVertrieb'))
@@ -89,6 +89,20 @@ try:
         liz = {x['partner']: x for x in prov(a) if x['art'] == 'lizenz'}
         ok('Lizenz nach Konditionen der Einrichtung (15 %, nicht neue 10 %)', liz.get('p3@x.de', {}).get('satz') == 15)
         ok('Lizenz: p3 15 % = 67,50 €, p2 3 % = 13,50 €', liz.get('p3@x.de', {}).get('betrag') == 67.5 and liz.get('p2@x.de', {}).get('betrag') == 13.5 and liz['p3@x.de']['lizenzMonat'] == 1)
+        # Sprachnotiz
+        a.click('#rec-start'); a.wait_for_selector('#rec-stop'); a.wait_for_timeout(1800); a.click('#rec-stop')
+        a.wait_for_selector('.logi:has-text("Testabschrift")', timeout=15000)
+        a.wait_for_timeout(600)
+        files = a.evaluate("()=>Object.keys(window.__files||{})")
+        ok('Sprachnotiz hochgeladen und abgeschrieben (%s)' % files, len(files) == 1 and files[0].startswith('sprachnotizen/'))
+        lg = a.evaluate("()=>[...__rows.values()].find(r=>r.data.firma==='Drei AG').data.crm.log.find(e=>e.type==='Sprachnotiz')")
+        ok('Protokolleintrag mit Audio und Text (%s)' % (lg or {}).get('text'), lg and lg['audio'] and 'Testabschrift' in lg['text'] and not lg.get('sttError'))
+        fnames = [u for u, d in fnlog if 'transcribe' in u]
+        ok('Abschrift über Server-Funktion', len(fnames) == 1)
+        a.click('.logi:has-text("Testabschrift") >> button:has-text("Anhören")'); a.wait_for_selector('.logi audio')
+        ok('Anhören zeigt Player', a.is_visible('.logi audio'))
+        a.click('.logi:has-text("Testabschrift") >> button:has-text("Löschen")'); a.click('.logi:has-text("Testabschrift") >> button:has-text("Löschen bestätigen")'); a.wait_for_timeout(400)
+        ok('Löschen entfernt Audiodatei', a.evaluate("()=>Object.keys(window.__files||{}).length") == 0)
         a.screenshot(path=T + '/v-kunde.png', full_page=True)
         # Storno der Lizenz
         a.click('.member:has-text("Lizenz") >> button:has-text("Stornieren")'); a.click('.confirm >> button:has-text("Stornieren")'); a.wait_for_timeout(600)
