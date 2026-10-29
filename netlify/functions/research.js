@@ -112,7 +112,7 @@ const cp = n => (Number.isInteger(n) && n > 0 && n <= 0x10FFFF && !(n >= 0xD800 
 const ENT = { nbsp: ' ', lt: '<', gt: '>', quot: '"', apos: "'", auml: 'ä', ouml: 'ö', uuml: 'ü', Auml: 'Ä', Ouml: 'Ö', Uuml: 'Ü', szlig: 'ß', euro: '€', ndash: '–', mdash: '—', bdquo: '„', ldquo: '“', rdquo: '”', copy: '©', reg: '®', middot: '·', eacute: 'é' };
 const decode = s => String(s).replace(/&#(\d{1,8});/g, (m, n) => cp(+n)).replace(/&#x([0-9a-f]{1,8});/gi, (m, n) => cp(parseInt(n, 16)))
   .replace(/&([a-zA-Z]+);/g, (m, n) => ENT[n] != null ? ENT[n] : (n === 'amp' ? '&' : m));
-const HTML_MAX = 200 * 1024;
+const HTML_MAX = MAX_BYTES;
 // Entfernt Blöcke wie <script>…</script> ohne Regex-Rückverfolgung (lineare Laufzeit, auch bei kaputtem HTML).
 function stripBlocks(html) {
   const lower = html.toLowerCase(); let out = '', i = 0;
@@ -139,7 +139,7 @@ function toText(html, max) {
   } catch (e) { return ''; }
 }
 function meta(html) {
-  const head = String(html).slice(0, 60000);
+  const head = String(html).slice(0, HTML_MAX);
   const g = re => { try { const m = re.exec(head); return m ? decode(m[1]).trim().slice(0, 300) : ''; } catch (e) { return ''; } };
   return { title: g(/<title[^<>]{0,200}>([^<]{0,500})/i), description: g(/<meta\s[^<>]{0,300}?name=["']description["'][^<>]{0,300}?content=["']([^"'<>]{0,600})/i) || g(/<meta\s[^<>]{0,300}?property=["']og:description["'][^<>]{0,300}?content=["']([^"'<>]{0,600})/i) };
 }
@@ -203,10 +203,10 @@ function verify(b, user) {
 async function claimPart(rid, part) {
   for (const n of [1, 2]) {
     const r = await admin('/rest/v1/docs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ collection: 'recherche-teile', id: rid + '-' + part + '-' + n, data: { at: new Date().toISOString() } }) }).catch(() => null);
-    if (r && r.ok) return true;
-    if (!r || r.status !== 409) return false;
+    if (r && r.ok) return 'ok';
+    if (!r || r.status !== 409) return 'error';
   }
-  return false;
+  return 'used';
 }
 
 // ---------- Claude ----------
@@ -321,9 +321,12 @@ exports.handler = async (event) => {
     const d = verify(b, user);
     if (!d) return json(400, { error: 'Die gelesenen Inhalte sind abgelaufen oder ungültig. Bitte die Recherche neu starten.' });
     if (part === 'b' && !d.questions.length) return json(200, { result: { antworten: {} } });
-    if (!(await claimPart(d.rid, part))) return json(429, { error: 'Diese Recherche wurde schon ausgewertet. Bitte neu recherchieren.' });
-    const limit = Number(process.env.RESEARCH_TIMEOUT_MS) || 9000;
-    const c = await askClaude(buildPrompt(part, d), MAX_TOKENS[part], Math.max(1500, limit - (Date.now() - t0)));
+    const claim = await claimPart(d.rid, part);
+    if (claim === 'error') return json(503, { error: 'Auswertung gerade nicht möglich. Bitte gleich erneut versuchen.' });
+    if (claim === 'used') return json(429, { error: 'Diese Recherche wurde schon ausgewertet. Bitte neu recherchieren.' });
+    const left = (Number(process.env.RESEARCH_TIMEOUT_MS) || 9000) - (Date.now() - t0);
+    if (left < 1000) return json(504, { error: 'Die KI-Auswertung hat zu lange gedauert. Bitte erneut versuchen.' });
+    const c = await askClaude(buildPrompt(part, d), MAX_TOKENS[part], left);
     if (c.error) return json(c.status, { error: c.error });
     const o = parseJson(c.text);
     if (!o) return json(502, { error: 'Die KI-Antwort war nicht lesbar. Bitte erneut versuchen.' });

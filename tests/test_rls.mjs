@@ -27,7 +27,7 @@ insert into team(email,role,sponsor,name) values ('p1@x.de','partner',null,'P1')
 insert into team(email,role,status) values ('weg@x.de','partner','inaktiv');
 insert into docs values ('customers','a','{"firma":"A","partner":"p1@x.de"}'),('customers','b','{"firma":"B","partner":"p2@x.de"}'),('customers','c','{"firma":"C"}'),
  ('templates','t','{}'),('legal','l','{}'),('config','provision','{}'),('zahlungen','z1','{"partner":"p1@x.de"}'),
- ('intern','kosten','{"fixkosten":4000}'),('provisionen','r1','{"partner":"p1@x.de"}'),('provisionen','r2','{"partner":"p2@x.de"}'),('gutschriften','g1','{"partner":"p1@x.de"}');`);
+ ('intern','kosten','{"fixkosten":4000}'),('provisionen','r1','{"partner":"p1@x.de"}'),('provisionen','r2','{"partner":"p2@x.de"}'),('gutschriften','g1','{"partner":"p1@x.de"}'),('recherchen','rc1','{"by":"p1@x.de"}'),('recherche-teile','rc1-a-1','{}'),('versand','v1','{"by":"p1@x.de"}');`);
 let pass = 0, fail = 0;
 const ok = (n, c) => { console.log((c ? 'OK   ' : 'FAIL ') + n); c ? pass++ : fail++; };
 async function as(email, fn) {
@@ -65,6 +65,8 @@ await as('p1@x.de', async () => {
   ok('Partner kann keinen Kunden für andere anlegen', !(await tryq(`insert into docs values ('customers','x','{"firma":"X","partner":"p2@x.de"}')`)));
   ok('Partner kann fremden Kunden nicht übernehmen', (await q(`update docs set data='{"partner":"p1@x.de"}' where id='b' returning id`)).length === 0);
   ok('Partner kann eigenen Kunden nicht weggeben', !(await tryq(`update docs set data='{"firma":"A","partner":"p2@x.de"}' where id='a'`)));
+  ok('Partner sieht keine Recherche-Zählung/Versandprotokolle', (await q(`select id from docs where collection in ('recherchen','recherche-teile','versand')`)).length === 0);
+  ok('Partner kann Recherche-Zählung nicht anlegen oder löschen', !(await tryq(`insert into docs values ('recherche-teile','rc1-a-9','{}')`)) && !(await tryq(`insert into docs values ('versand','v9','{}')`)) && (await q(`delete from docs where collection in ('recherchen','recherche-teile') returning id`)).length === 0);
   ok('Partner kann keine Provision anlegen', !(await tryq(`insert into docs values ('provisionen','fake','{"partner":"p1@x.de"}')`)));
   ok('Partner kann Provision nicht ändern', (await q(`update docs set data='{"partner":"p1@x.de","betrag":99999}' where id='r1' returning id`)).length === 0);
   ok('Partner kann Modell nicht ändern', (await q(`update docs set data='{"x":1}' where collection='config' returning id`)).length === 0);
