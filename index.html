@@ -332,6 +332,8 @@ function crmPatch(c,status){
 }
 const STAMM=[['firma','Firma'],['ansprechpartner','Ansprechpartner'],['email','E-Mail'],['telefon','Telefon'],['adresse','Adresse']];
 const STAMM_KEYS=['firma','ansprechpartner','email','telefon','adresse','branche'];
+function normWeb(v){v=String(v||'').trim();if(!v)return '';if(!/^https?:\/\//i.test(v))v='https://'+v;try{const u=new URL(v);return u.hostname.includes('.')?u.origin+(u.pathname==='/'?'':u.pathname):'';}catch(e){return '';}}
+function webHost(v){try{return new URL(v).hostname.replace(/^www\./,'');}catch(e){return v;}}
 const STAMM_LABEL={firma:'Firma',ansprechpartner:'Ansprechpartner',email:'E-Mail',telefon:'Telefon',adresse:'Adresse',branche:'Branche'};
 const LEGAL_REQ=['dsb','speicherung','hinweis','agb'];
 function progress(c){
@@ -408,6 +410,7 @@ async function createCustomer(data){
   const ref=S.db.collection('customers').doc();
   await ref.set(Object.assign({product:'KI-Telefon-Agent',templateId:TPL_ID,answers:{},legal:{},crm:{status:'neu',history:[{s:'neu',at:now,by:(S.me&&S.me.email)||''}]},createdAt:now,updatedAt:now},(S.me&&S.me.role==='partner')?{partner:S.me.email}:{},data));
   S.curId=ref.id;S.view='start';S.newOpen=false;render();
+  return ref.id;
 }
 
 /* ---------- sidebar ---------- */
@@ -421,8 +424,12 @@ function renderSide(){
   if(!S.db){nb.append(h('div',{class:'eyebrow',text:'Speichern ist in dieser Ansicht nicht verfügbar.'}));}
   else if(!S.newOpen){nb.append(h('button',{type:'button',class:'btn ghost-dashed',onclick:()=>{S.newOpen=true;renderSide();setTimeout(()=>{const f=document.getElementById('nc-firma');f&&f.focus();},0);}},'+ Neuer Kunde'));}
   else{
-    const form=h('form',{class:'card',style:'padding:14px;gap:10px',onsubmit:e=>{e.preventDefault();const v=document.getElementById('nc-firma').value.trim();if(!v){toast('Bitte einen Firmennamen eintragen.');return;}createCustomer({firma:v});}},
+    const form=h('form',{class:'card',style:'padding:14px;gap:10px',onsubmit:async e=>{e.preventDefault();const v=document.getElementById('nc-firma').value.trim(),w=normWeb(document.getElementById('nc-web').value);
+        if(!v&&!w){toast('Bitte Firma oder Webseite eintragen.');return;}
+        const id=await createCustomer(Object.assign({firma:v||webHost(w)},w?{webseite:w}:{}));
+        if(w&&id)runResearch({id,webseite:w});}},
       h('div',{class:'field'},h('label',{for:'nc-firma'},'Firma'),h('input',{type:'text',id:'nc-firma',autocomplete:'organization'})),
+      h('div',{class:'field'},h('label',{for:'nc-web'},'Webseite (optional, für die Recherche)'),h('input',{type:'text',id:'nc-web',inputmode:'url',autocapitalize:'off',spellcheck:'false',placeholder:'www.beispiel.de',autocomplete:'url'})),
       h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Anlegen'),h('button',{type:'button',class:'btn',onclick:()=>{S.newOpen=false;renderSide();}},'Abbrechen')));
     nb.append(form);
   }
@@ -476,7 +483,9 @@ function viewStart(c){
   const changed=sgS?STAMM_KEYS.filter(k=>k!=='branche'&&String(sgS[k]||'').trim()!==String(c[k]||'').trim()):[];
   const stamm=h('section',{class:'card','aria-label':'Stammdaten'},h('h2',null,'Stammdaten'),
     changed.length?h('div',{class:'banner info'},'Geändert seit der Unterschrift: '+changed.map(k=>STAMM_LABEL[k]).join(', ')+'. Das PDF und die Vereinbarung zeigen weiter die unterschriebene Fassung ('+changed.map(k=>STAMM_LABEL[k]+': „'+(sgS[k]||'–')+'“').join(', ')+'). Für eine neue Fassung unter „Unterschrift“ eine neue Version starten.'):null,
-    h('div',{class:'grid2'},f('s-firma','Firma','firma'),f('s-ap','Ansprechpartner','ansprechpartner'),f('s-mail','E-Mail','email','email'),f('s-tel','Telefon','telefon','tel'),f('s-adr','Adresse','adresse'),f('s-br','Branche','branche')));
+    h('div',{class:'grid2'},f('s-firma','Firma','firma'),f('s-ap','Ansprechpartner','ansprechpartner'),f('s-mail','E-Mail','email','email'),f('s-tel','Telefon','telefon','tel'),f('s-adr','Adresse','adresse'),f('s-br','Branche','branche'),
+      h('div',{class:'field'},h('label',{for:'s-web'},'Webseite'),h('input',{type:'text',id:'s-web',inputmode:'url',autocapitalize:'off',spellcheck:'false',placeholder:'www.beispiel.de',value:c.webseite||'',onchange:e=>{const w=normWeb(e.target.value);e.target.value=w;saveCust(c.id,{webseite:w},0);}}))),
+    researchBar(c));
   const del=S.confirm==='del'+c.id
     ?h('div',{class:'confirm'},'Kundenakte „'+(c.firma||'')+'“ endgültig löschen?',h('button',{type:'button',class:'btn danger',onclick:async()=>{try{const {data:fl}=await S.sb.storage.from('sprachnotizen').list(c.id);if(fl&&fl.length)await S.sb.storage.from('sprachnotizen').remove(fl.map(f=>c.id+'/'+f.name));}catch(x){}await S.db.doc('customers/'+c.id).delete();S.curId=null;S.confirm=null;S.view='start';toast('Kundenakte gelöscht');render();}},'Ja, löschen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
     :h('button',{type:'button',class:'btn danger',onclick:()=>{S.confirm='del'+c.id;render();}},'Kundenakte löschen');
@@ -484,7 +493,7 @@ function viewStart(c){
   return [
     h('div',{class:'row',style:'align-items:flex-end'},h('div',null,h('div',{class:'eyebrow'},'KI-Telefon-Agent'),h('h1',null,c.firma||'Ohne Namen')),h('div',{class:'spacer'}),
       next?h('button',{type:'button',class:'btn primary',onclick:()=>{S.view=next.id;render();}},'Weiter: '+next.t):null),
-    stamm,crmCard(c),payCard(c),progressEl(c,false),stages,isAdmin()?h('div',{class:'row'},del):null];
+    stamm,researchCard(c),crmCard(c),payCard(c),progressEl(c,false),stages,isAdmin()?h('div',{class:'row'},del):null];
 }
 
 function viewFragen(c){
@@ -499,7 +508,9 @@ function viewFragen(c){
       h('label',{for:'q-'+q.id},num+' · '+q.text+' ',q.star?h('span',{class:'star-mark','aria-label':'im Termin klären'},'★'):null),
       (()=>{const hint=h('div',{class:'eyebrow late',id:'qh-'+q.id,hidden:!(a[q.id]&&!realAnswer(a[q.id]))},'Bitte eine echte Antwort eintragen – ein Punkt, „x“ oder „-“ zählt nicht.');
         const na=isNA(c,q);
-        return [h('textarea',{id:'q-'+q.id,disabled:ro||na,value:na?'':(a[q.id]||''),placeholder:na?'Entfällt':'',oninput:e=>{const p={answers:{}};p.answers[q.id]=e.target.value;saveCust(c.id,p);hint.hidden=!(e.target.value.trim()&&!realAnswer(e.target.value));}}),hint,
+        const sug=!ro&&!na&&!realAnswer(a[q.id])&&c.recherche&&c.recherche.antworten&&c.recherche.antworten[q.id];
+        return [sug?h('div',{class:'banner info',style:'display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;padding:10px 12px'},h('span',{style:'flex:1 1 220px'},h('strong',null,'Vorschlag aus der Recherche: '),sug,h('span',{class:'eyebrow'},' – bitte im Termin bestätigen')),h('button',{type:'button',class:'btn',style:'min-height:38px;font-size:14px',onclick:()=>{const p={answers:{}};p.answers[q.id]=sug+' (vorab recherchiert)';saveCust(c.id,p,0);render._force=true;render();}},'Übernehmen')):null,
+          h('textarea',{id:'q-'+q.id,disabled:ro||na,value:na?'':(a[q.id]||''),placeholder:na?'Entfällt':'',oninput:e=>{const p={answers:{}};p.answers[q.id]=e.target.value;saveCust(c.id,p);hint.hidden=!(e.target.value.trim()&&!realAnswer(e.target.value));}}),hint,
           q.star?null:h('label',{class:'check',style:'min-height:36px;padding-block:2px;font-size:14px'},h('input',{type:'checkbox',id:'qna-'+q.id,disabled:ro,checked:na,onchange:e=>{const p={na:{}};p.na[q.id]=e.target.checked;saveCust(c.id,p,0);render._force=true;render();}}),'Entfällt für diesen Kunden')];})());
   });
   return [
@@ -874,6 +885,108 @@ function viewVorlagen(){
 }
 
 /* ---------- CRM ---------- */
+/* ---------- Firmenrecherche & Vorab-Broschüre ---------- */
+S.research={};
+function researchBar(c){
+  const st=S.research[c.id];
+  return h('div',{class:'row',style:'gap:10px'},
+    h('button',{type:'button',class:'btn',id:'res-btn',disabled:!!(st&&st.busy),onclick:()=>{const w=normWeb((document.getElementById('s-web')||{}).value||c.webseite);if(!w){toast('Bitte zuerst die Webseite eintragen.');return;}if(w!==c.webseite)saveCust(c.id,{webseite:w},0);c.webseite=w;runResearch(c);}},st&&st.busy?st.step:(c.recherche?'🔎 Erneut recherchieren':'🔎 Firma recherchieren')),
+    st&&st.error?h('span',{class:'eyebrow late'},st.error):h('span',{class:'eyebrow'},'Liest öffentliche Seiten (Start, Impressum, Leistungen, Kontakt) und fasst sie mit KI zusammen.'));
+}
+async function runResearch(c){
+  const url=c.webseite;if(!url)return;
+  S.research[c.id]={busy:true,step:'Webseite wird gelesen …'};render._force=true;render();
+  try{
+    const f=await callFn('research',{step:'fetch',url,customerId:c.id});
+    S.research[c.id]={busy:true,step:'KI wertet aus …'};render._force=true;render();
+    const qs=allQs().map(q=>({id:q.id,text:q.text}));const st=cfg().staffeln.map(x=>({id:x.id,label:x.label}));
+    const a=await callFn('research',{step:'analyze',url:f.url,customerId:c.id,pages:f.pages,questions:qs,staffeln:st});
+    const r=Object.assign({},a.result,{at:new Date().toISOString(),url:f.url,by:(S.me&&S.me.email)||''});
+    await flushAll();
+    let fresh=S.customers.find(x=>x.id===c.id);if(!fresh){const sn=await S.db.doc('customers/'+c.id).get();fresh=sn.exists?Object.assign({id:c.id},sn.data()):null;}
+    if(!fresh)throw new Error('Kundenakte nicht gefunden.');
+    const patch={recherche:r};
+    // leere Stammdaten automatisch füllen; Platzhalter-Firma (Domain) ersetzen
+    for(const k of ['firma','adresse','telefon','email','ansprechpartner','branche']){const cv=String(fresh[k]||'').trim();if(r[k]&&(!cv||(k==='firma'&&cv===webHost(url))))patch[k]=r[k];}
+    // Vorschläge ersetzen statt zusammenführen
+    const full=JSON.parse(JSON.stringify(fresh));Object.assign(full,patch,{updatedAt:new Date().toISOString()});delete full.id;
+    await S.db.doc('customers/'+c.id).set(full);
+    S.research[c.id]={busy:false};toast('Recherche fertig');
+  }catch(e){S.research[c.id]={busy:false,error:e.message};}
+  render._force=true;render();
+}
+function researchCard(c){
+  const r=c.recherche;if(!r)return null;
+  const diffs=['firma','adresse','telefon','email','ansprechpartner','branche'].filter(k=>r[k]&&String(c[k]||'').trim()&&String(c[k]).trim()!==r[k]);
+  const li=arr=>h('ul',{style:'margin:4px 0 0;padding-left:20px'},...arr.map(x=>h('li',null,x)));
+  const row=(l,v)=>v&&(!Array.isArray(v)||v.length)?h('div',null,h('div',{class:'label'},l),Array.isArray(v)?li(v):h('div',{style:'overflow-wrap:anywhere'},v)):null;
+  const stf=r.staffel&&cfg().staffeln.find(x=>x.id===r.staffel);const nAnt=Object.keys(r.antworten||{}).filter(id=>!realAnswer((c.answers||{})[id])).length;
+  const mailOpen=S.broMail===c.id;
+  return h('section',{class:'card','aria-label':'Vorab-Recherche'},
+    h('div',{class:'row'},h('h2',null,'Vorab recherchiert'),h('div',{class:'spacer'}),h('span',{class:'eyebrow'},fmtDate(r.at)+' · '+webHost(r.url))),
+    h('div',{class:'banner warn'},'Automatisch aus der Webseite zusammengefasst. Kann Fehler enthalten – im Termin bestätigen.'),
+    diffs.length?h('div',{class:'dlist'},...diffs.map(k=>h('div',{class:'member'},h('div',{class:'who'},h('strong',null,STAMM_LABEL[k]+': '),r[k],h('div',{class:'eyebrow'},'bisher: '+c[k])),h('button',{type:'button',class:'btn',style:'min-height:38px;font-size:14px',onclick:()=>{const p={};p[k]=r[k];saveCust(c.id,p,0);render._force=true;render();}},'Übernehmen')))):null,
+    row('Kurzprofil',r.kurzprofil),
+    h('div',{class:'cols2'},row('Leistungen',r.leistungen),h('div',{style:'display:flex;flex-direction:column;gap:10px'},row('Zielkunden',r.zielkunden),row('Erreichbarkeit / Öffnungszeiten',r.oeffnungszeiten),row('Standorte',r.standorte),row('Größe',r.mitarbeiter))),
+    row('Ansatzpunkte für den KI-Telefon-Agenten',r.ansatzpunkte),
+    h('div',{class:'row',style:'gap:10px'},
+      stf?h('button',{type:'button',class:'btn',onclick:()=>{const items=((c.offer||{}).items||[]).filter(i=>i.kind!=='einrichtung'&&i.kind!=='lizenz');saveCust(c.id,{offer:{items:staffelItems(stf).concat(items),staffel:stf.id}},0);toast('Staffel „'+stf.label+'“ ins Angebot übernommen');render._force=true;render();}},'Staffel vorschlagen: '+stf.label):null,
+      nAnt?h('button',{type:'button',class:'btn',onclick:()=>{S.view='fragen';S.section=0;render();window.scrollTo(0,0);}},nAnt+(nAnt===1?' Vorschlag':' Vorschläge')+' im Fragenkatalog'):null,
+      h('button',{type:'button',class:'btn primary',onclick:async()=>{try{const b=await brochurePdf(c);await S.dl.save({filename:brochureName(c),data:b});}catch(e){toast('PDF fehlgeschlagen: '+e.message);}}},'Vorab-Broschüre (PDF)'),
+      h('button',{type:'button',class:'btn',onclick:()=>{S.broMail=mailOpen?null:c.id;render._force=true;render();}},'Broschüre per E-Mail')),
+    mailOpen?broMailForm(c):null,
+    r.quellen&&r.quellen.length?h('div',{class:'eyebrow',style:'overflow-wrap:anywhere'},'Quellen: '+r.quellen.join(' · ')):null);
+}
+function brochureName(c){return ('ONLION_KI-Telefon-Agent_fuer_'+(c.firma||'Kunde')).replace(/[^\wäöüÄÖÜß.-]+/g,'_')+'.pdf';}
+function broMailForm(c){
+  const st=h('div',{class:'banner warn',hidden:true});
+  const ap=String(c.ansprechpartner||'').trim();
+  return h('form',{class:'card',style:'background:var(--panel2)',onsubmit:async e=>{
+    e.preventDefault();const to=document.getElementById('bm-to').value.trim();
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)){st.textContent='Bitte eine gültige E-Mail-Adresse eintragen.';st.hidden=false;return;}
+    if(!document.getElementById('bm-ok').checked){st.textContent='Bitte bestätigen, dass der Empfänger der Zusendung zugestimmt hat.';st.hidden=false;return;}
+    const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;btn.textContent='Sende …';
+    try{const b=await brochurePdf(c);await callFn('send-pdf',{to,toName:ap,subject:document.getElementById('bm-subj').value,message:document.getElementById('bm-msg').value,filename:brochureName(c),pdfBase64:await blobToBase64(b)});
+      const entry={id:uid(),at:new Date().toISOString(),by:(S.me&&S.me.email)||'',type:'E-Mail',text:'Vorab-Broschüre an '+to+' gesendet (Zustimmung des Empfängers bestätigt).'};
+      saveCust(c.id,{crm:{log:[entry].concat(crmOf(cur()||c).log||[])}},0);S.broMail=null;toast('Broschüre gesendet');render._force=true;render();}
+    catch(err){st.textContent=err.message;st.hidden=false;btn.disabled=false;btn.textContent='Senden';}
+  }},h('div',{class:'banner info'},'Werbung per E-Mail ist ohne Einwilligung auch an Firmen nicht erlaubt (§ 7 UWG). Nur senden, wenn der Empfänger zugestimmt hat – z. B. im Telefonat. Sonst die Broschüre mitbringen oder per Post senden.'),
+    h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'bm-to'},'An'),h('input',{type:'email',id:'bm-to',value:c.email||''})),h('div',{class:'field'},h('label',{for:'bm-subj'},'Betreff'),h('input',{type:'text',id:'bm-subj',value:'Ihr KI-Telefon-Agent – Vorab-Information von ONLION'}))),
+    h('div',{class:'field'},h('label',{for:'bm-msg'},'Nachricht'),h('textarea',{id:'bm-msg',style:'min-height:110px',value:(ap?'Guten Tag '+ap+',':'Guten Tag,')+'\n\nwie besprochen erhalten Sie anbei eine erste Vorab-Information, wie ein KI-Telefon-Agent für '+(c.firma||'Ihr Unternehmen')+' aussehen könnte.\n\nViele Grüße\nONLION'})),
+    h('label',{class:'check'},h('input',{type:'checkbox',id:'bm-ok'}),'Der Empfänger hat der Zusendung zugestimmt.'),
+    st,h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Senden'),h('button',{type:'button',class:'btn',onclick:()=>{S.broMail=null;render();}},'Abbrechen')));
+}
+async function brochurePdf(c){
+  const r=c.recherche||{};const br=r.broschuere||{};const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210,M=20,CW=W-2*M;let y=0;const INK=[28,28,26],MUT=[112,112,104],LIME=[200,255,0],ACC=[74,102,0],SOFT=[245,245,241];
+  const col=a=>doc.setTextColor(a[0],a[1],a[2]);const font=(sz,st)=>{doc.setFont('helvetica',st||'normal');doc.setFontSize(sz);};
+  const wrap=(t,sz,st,w)=>{font(sz,st);return doc.splitTextToSize(clean(t),w||CW);};
+  const need=hh=>{if(y+hh>272){doc.addPage();y=24;}};
+  const para=(t,sz,st,c2,gap)=>{const l=wrap(t,sz,st);need(l.length*sz*0.45+2);font(sz,st);col(c2||INK);doc.text(l,M,y);y+=l.length*sz*0.45+(gap==null?3:gap);};
+  const bullets=arr=>{for(const t of arr){const l=wrap(t,10.5,'normal',CW-8);need(l.length*4.8+2);doc.setFillColor(...LIME);doc.circle(M+1.6,y-1.3,1.3,'F');font(10.5);col(INK);doc.text(l,M+7,y);y+=l.length*4.8+2.2;}y+=2;};
+  const h2=t=>{need(16);y+=3;font(13.5,'bold');col(INK);doc.text(clean(t),M,y);doc.setDrawColor(...LIME);doc.setLineWidth(1.1);doc.line(M,y+2.4,M+16,y+2.4);y+=10;};
+  let logo=null;try{logo=await imgData('logo-black.png');}catch(e){}
+  // Titel
+  doc.setFillColor(...SOFT);doc.rect(0,0,W,86,'F');
+  if(logo)doc.addImage(logo,'PNG',M,18,40,8.3,'logo','FAST');
+  font(10,'bold');col(ACC);doc.text('VORAB-INFORMATION',M,42);
+  font(24,'bold');col(INK);const tl=doc.splitTextToSize(clean('Ihr KI-Telefon-Agent für '+(c.firma||'Ihr Unternehmen')),CW);doc.text(tl,M,53);
+  font(11);col(MUT);doc.text(clean('Erreichbar rund um die Uhr – ohne zusätzliches Personal.'),M,53+tl.length*9.5);
+  doc.setFillColor(...LIME);doc.rect(0,86,W,2.2,'F');y=102;
+  if(r.kurzprofil){h2('Was wir über '+(c.firma||'Sie')+' wissen');para(r.kurzprofil,10.5,'normal',INK,4);}
+  if(br.begruessung){h2('So meldet sich Ihr Agent');const l=wrap('„'+br.begruessung+'“',11.5,'italic',CW-14);need(l.length*5.4+12);doc.setFillColor(...SOFT);doc.roundedRect(M,y-5,CW,l.length*5.4+8,2.5,2.5,'F');doc.setFillColor(...LIME);doc.rect(M,y-5,1.6,l.length*5.4+8,'F');font(11.5,'italic');col(INK);doc.text(l,M+7,y+0.5);y+=l.length*5.4+9;}
+  if((br.anliegen||[]).length){h2('Typische Anliegen, die er übernimmt');bullets(br.anliegen);}
+  if((br.weiterleitungen||[]).length){h2('Wann er an Ihr Team weiterleitet');bullets(br.weiterleitungen);}
+  if((br.nutzen||[]).length){h2('Ihr Nutzen');bullets(br.nutzen);}
+  h2('So läuft die Einführung');
+  bullets(['Gespräch: Ziele, Anliegen und Abläufe gemeinsam festlegen','Einrichtung: Begrüßung, Wissen und Weiterleitungen werden eingerichtet','Test: Sie rufen selbst an und geben Feedback','Start: Rufumleitung aktivieren – Ihr Agent ist erreichbar']);
+  const stf=(r.staffel&&cfg().staffeln.find(x=>x.id===r.staffel))||null;
+  if(stf&&!stf.individuell){h2('Investition');need(26);doc.setFillColor(...SOFT);doc.roundedRect(M,y-5,CW,22,2.5,2.5,'F');font(10);col(MUT);doc.text(clean('Paket '+stf.label),M+6,y+1.5);font(13,'bold');col(INK);doc.text(clean(eur(stf.einrichtung)+' Einrichtung  +  '+eur(stf.lizenz)+' pro Monat'),M+6,y+9.5);font(8.5);col(MUT);doc.text(clean('zzgl. USt. Unverbindliche Vorab-Information, das verbindliche Angebot folgt nach dem Gespräch.'),M+6,y+14.5);y+=26;}
+  const ab=cfg().absender||{};
+  const pages=doc.getNumberOfPages();for(let i=1;i<=pages;i++){doc.setPage(i);font(7.5);col(MUT);doc.text(clean(['ONLION',ab.adresse].filter(Boolean).join(' · ')),M,288);doc.text('Seite '+i+' von '+pages,W-M,288,{align:'right'});}
+  return doc.output('blob');
+}
+
 /* ---------- Sprachnotizen ---------- */
 const REC_MAX=180;
 function recSupported(){return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);}
@@ -1083,7 +1196,7 @@ const r2=x=>Math.round((Number(x)||0)*100)/100;
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
 function isAdmin(){return !S.me||S.me.role!=='partner';}
 function isOwner(){return !!(S.me&&S.me.role==='owner');}
-function cfg(){const c=S.cfg||{};return {leadText:c.leadText||undefined,aktionen:Array.isArray(c.aktionen)?c.aktionen:[],versions:(c.versions&&c.versions.length)?c.versions:DEFAULT_CFG.versions,draft:c.draft||null,staffeln:(c.staffeln&&c.staffeln.length)?c.staffeln:DEFAULT_CFG.staffeln,absender:Object.assign({},DEFAULT_CFG.absender,c.absender||{}),kosten:Object.assign({},DEFAULT_CFG.kosten,S.kosten||{})};}
+function cfg(){const c=S.cfg||{};return {rechercheLimit:c.rechercheLimit==null?30:c.rechercheLimit,leadText:c.leadText||undefined,aktionen:Array.isArray(c.aktionen)?c.aktionen:[],versions:(c.versions&&c.versions.length)?c.versions:DEFAULT_CFG.versions,draft:c.draft||null,staffeln:(c.staffeln&&c.staffeln.length)?c.staffeln:DEFAULT_CFG.staffeln,absender:Object.assign({},DEFAULT_CFG.absender,c.absender||{}),kosten:Object.assign({},DEFAULT_CFG.kosten,S.kosten||{})};}
 function saveCfg(patch){const c=Object.assign({},cfg(),patch);delete c.kosten;S.cfg=c;return S.db.doc('config/provision').set(c);}
 /* Kostenmodell liegt getrennt in intern/kosten: nur ONLION darf es lesen (Partner haben auf „intern“ keinen Zugriff) */
 function saveKosten(k){S.kosten=Object.assign({},k);return S.db.doc('intern/kosten').set(S.kosten);}
@@ -1418,6 +1531,9 @@ function vtPartner(){
       h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'pi-name'},'Name'),h('input',{type:'text',id:'pi-name',value:pf.name||''})),h('div',{class:'field'},h('label',{for:'pi-mail'},'E-Mail'),h('input',{type:'email',id:'pi-mail',value:pf.email||'',autocomplete:'off'})),h('div',{class:'field'},h('label',{for:'pi-sponsor'},'Geworben von'),sp)),
       st,h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Einladen'))));
   }
+  // Recherche-Grenze
+  {const lim=h('input',{type:'number',id:'rl-lim',min:'0',step:'1',inputmode:'numeric',value:String(cfg().rechercheLimit)});
+   out.push(h('section',{class:'card'},h('h2',null,'Firmenrecherche'),h('div',{class:'grid2',style:'align-items:end'},h('div',{class:'field'},h('label',{for:'rl-lim'},'Recherchen pro Partner und Monat'),lim),h('div',null,h('button',{type:'button',class:'btn primary',onclick:async()=>{await saveCfg({rechercheLimit:Math.max(0,parseInt(lim.value,10)||0)});toast('Gespeichert');}},'Speichern'))),h('div',{class:'eyebrow'},'ONLION ist nicht begrenzt. Eine Recherche kostet etwa 1–5 Cent KI-Gebühren.')));}
   // Struktur
   const tree=h('div',{class:'dlist'});const ps=partners();
   if(!ps.length)tree.append(h('div',{class:'eyebrow'},'Noch keine Vertriebspartner.'));

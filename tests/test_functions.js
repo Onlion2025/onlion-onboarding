@@ -26,8 +26,17 @@ global.fetch = async (url, opts = {}) => {
     return R(200, { id: 'uid-' + b.email, email: b.email, action_link: 'https://x.supabase.co/auth/v1/verify?token=T&type=' + b.type + '&redirect_to=' + b.redirect_to });
   }
   if (url.includes('/auth/v1/admin/users/')) return R(200, {});
+  if (url.includes('/rest/v1/docs?select=data&collection=eq.config')) return R(200, [{ data: { rechercheLimit: 1 } }]);
+  if (url.includes('/rest/v1/docs?select=id&collection=eq.recherchen')) return R(200, recherchen.filter(x => url.includes(encodeURIComponent(x.by))));
+  if (url.endsWith('/rest/v1/docs') && opts.method === 'POST') { const b = JSON.parse(opts.body); if (b.collection === 'recherchen') recherchen.push(b.data); return R(201, {}); }
   if (url.includes('/rest/v1/docs')) { const m = /id=eq\.([^&]+)/.exec(url); return R(200, m && decodeURIComponent(m[1]) === 'kundeA' ? [{ data: { firma: 'A', partner: 'vp1@x.de' } }] : []); }
   if (url.includes('/storage/v1/object/sprachnotizen/')) return { ok: !url.includes('fehlt'), status: url.includes('fehlt') ? 404 : 200, headers: { get: () => 'audio/webm' }, arrayBuffer: async () => new ArrayBuffer(1000) };
+  if (url.startsWith('https://www.muster.de') || url.startsWith('https://muster.de')) {
+    webCalls.push(url);
+    const html = url.endsWith('/') ? '<html><head><title>Muster GmbH</title></head><body><a href="/impressum">Impressum</a><a href="https://fremd.de/x">x</a><script>evil()</script><p>Wir sind Ihr Immobilienmakler in Nürnberg für Verkauf und Vermietung seit 1990.</p></body></html>' : '<p>Impressum: Muster GmbH, Hauptstr. 1, 90402 Nürnberg, Geschäftsführer Max Muster</p>';
+    return { ok: true, status: 200, headers: { get: k => k === 'content-type' ? 'text/html; charset=utf-8' : null }, body: { getReader: () => { let d = false; return { read: async () => d ? { done: true } : (d = true, { done: false, value: new TextEncoder().encode(html) }) }; } } };
+  }
+  if (url.includes('api.anthropic.com')) { claudeCalls.push(opts); return R(200, { content: [{ type: 'text', text: 'Hier: {"firma":"Muster GmbH","branche":"Makler","staffel":"s1","antworten":{"q04":"60","qX":"x"},"broschuere":{"anliegen":["A"]},"quellen":["https://www.muster.de/impressum","javascript:alert(1)"]}' }] }); }
   if (url.includes('api.elevenlabs.io')) { sttCalls.push(opts); return R(200, { text: ' Hallo Abschrift ' }); }
   return { ok: upstream.status < 300, status: upstream.status, json: async () => upstream.body };
 };
@@ -39,6 +48,10 @@ const send = require(path + 'send-pdf.js').handler;
 const teamFn = require(path + 'team.js').handler;
 const resetFn = require(path + 'reset-password.js').handler;
 const sttFn = require(path + 'transcribe.js').handler;
+const resFn = require(path + 'research.js').handler;
+const dnsMod = require('dns').promises; const origLookup = dnsMod.lookup;
+dnsMod.lookup = async (h) => h === 'intern.example.de' ? [{ address: '10.0.0.5', family: 4 }] : h === 'meta.example.de' ? [{ address: '169.254.169.254', family: 4 }] : [{ address: '93.184.216.34', family: 4 }];
+let claudeCalls = [], webCalls = [], recherchen = [];
 const ev = (body, auth = 'Bearer tok') => ({ httpMethod: 'POST', headers: { authorization: auth }, body: JSON.stringify(body) });
 let pass = 0; const ok = (n, c) => { assert.ok(c, n); pass++; console.log('OK   ' + n); };
 
@@ -119,6 +132,30 @@ let pass = 0; const ok = (n, c) => { assert.ok(c, n); pass++; console.log('OK   
   r = await sttFn(ev({ customerId: 'kundeA', path: 'kundeA/../x.webm' })); ok('Pfad-Tricks abgewiesen', r.statusCode === 400);
   r = await sttFn(ev({ customerId: 'kundeA', path: 'kundeA/fehlt.webm' })); ok('Fehlende Datei 404', r.statusCode === 404);
   userMail = 'fremd@x.de'; r = await sttFn(ev({ customerId: 'kundeA', path: 'kundeA/abc.webm' })); ok('Fremde 401', r.statusCode === 401); userMail = 'adam@onlion.de';
+
+
+  // Firmenrecherche
+  process.env.ANTHROPIC_API_KEY = 'ak-key';
+  userMail = 'adam@onlion.de';
+  r = await resFn(ev({ step: 'fetch', url: 'www.muster.de' }));
+  const fr = JSON.parse(r.body);
+  ok('Recherche liest Startseite und Impressum (gleiche Domain)', r.statusCode === 200 && fr.pages.length === 2 && webCalls.every(u => u.includes('muster.de')) && !fr.pages[0].text.includes('evil'));
+  r = await resFn(ev({ step: 'fetch', url: 'http://intern.example.de' })); ok('Interne Adresse abgewiesen', r.statusCode === 400);
+  r = await resFn(ev({ step: 'fetch', url: 'http://meta.example.de' })); ok('Metadaten-Adresse abgewiesen', r.statusCode === 400);
+  r = await resFn(ev({ step: 'fetch', url: 'http://127.0.0.1' })); ok('IP-Adresse abgewiesen', r.statusCode === 400);
+  r = await resFn(ev({ step: 'fetch', url: 'file:///etc/passwd' })); ok('Andere Protokolle abgewiesen', r.statusCode === 400);
+  r = await resFn(ev({ step: 'analyze', url: 'https://www.muster.de/', pages: fr.pages, questions: [{ id: 'q04', text: 'Anrufe?' }], staffeln: [{ id: 's1', label: '1-49' }] }));
+  const ar = JSON.parse(r.body).result;
+  const cc = claudeCalls[claudeCalls.length - 1];
+  ok('Claude: Schlüssel im Header, Modell gesetzt', cc.headers['x-api-key'] === 'ak-key' && cc.headers['anthropic-version'] === '2023-06-01' && JSON.parse(cc.body).model === 'claude-haiku-5-5');
+  ok('Ergebnis bereinigt (nur bekannte Fragen, sichere Quellen)', ar.firma === 'Muster GmbH' && ar.antworten.q04 === '60' && !ar.antworten.qX && ar.quellen.length === 1 && ar.staffel === 's1');
+  userMail = 'vp1@x.de';
+  r = await resFn(ev({ step: 'fetch', url: 'www.muster.de', customerId: 'kundeB' })); ok('Partner: fremder Kunde 403', r.statusCode === 403);
+  r = await resFn(ev({ step: 'analyze', url: 'x', customerId: 'kundeA', pages: fr.pages, questions: [], staffeln: [] })); ok('Partner: eigener Kunde, Recherche gezählt', r.statusCode === 200 && recherchen.some(x => x.by === 'vp1@x.de'));
+  r = await resFn(ev({ step: 'fetch', url: 'www.muster.de', customerId: 'kundeA' })); ok('Partner: Monatsgrenze greift', r.statusCode === 429);
+  userMail = 'adam@onlion.de';
+  r = await resFn(ev({ step: 'fetch', url: 'www.muster.de' })); ok('ONLION ohne Grenze', r.statusCode === 200);
+  dnsMod.lookup = origLookup;
 
   console.log('\n' + pass + ' Funktionstests bestanden');
 })().catch(e => { console.error('FAIL', e.message); process.exit(1); });

@@ -30,6 +30,12 @@ try:
         fncalls=[]
         def fn_route(r):
             fncalls.append((r.request.url, r.request.headers.get('authorization'), r.request.post_data))
+            if 'research' in r.request.url:
+                d = json.loads(r.request.post_data or '{}')
+                if d.get('step') == 'fetch':
+                    return r.fulfill(status=200, content_type='application/json', body=json.dumps({'url': 'https://www.muster-immo.de/', 'meta': {}, 'pages': [{'url': 'https://www.muster-immo.de/', 'text': 'Muster Immobilien GmbH – Ihr Makler in Nürnberg'}]}))
+                res = {'firma': 'Muster Immobilien GmbH', 'adresse': 'Hauptstr. 1, 90402 Nürnberg', 'telefon': '0911 123456', 'email': 'info@muster-immo.de', 'ansprechpartner': 'Eva Muster', 'branche': 'Immobilienmakler', 'staffel': 's1', 'mitarbeiter': 'ca. 8', 'kurzprofil': 'Makler für Wohnimmobilien in Nürnberg.', 'leistungen': ['Verkauf', 'Vermietung'], 'zielkunden': 'Eigentümer', 'oeffnungszeiten': 'Mo–Fr 9–18 Uhr', 'standorte': ['Nürnberg'], 'ansatzpunkte': ['Anrufe nach Feierabend'], 'antworten': {'q04': 'ca. 60 Anrufe pro Woche (Vermutung)'}, 'broschuere': {'begruessung': 'Guten Tag, Muster Immobilien, hier spricht Lea.', 'anliegen': ['Exposé anfordern', 'Besichtigung'], 'weiterleitungen': ['Bei Verkaufsabsicht an Frau Muster'], 'nutzen': ['Keine verpassten Anrufe']}, 'quellen': ['https://www.muster-immo.de/impressum']}
+                return r.fulfill(status=200, content_type='application/json', body=json.dumps({'result': res}))
             r.fulfill(status=200, content_type='application/json', body='{"ok":true,"id":"lx-1"}')
         page.route('**/.netlify/functions/**', fn_route)
         page.goto('http://localhost:8765/index.html')
@@ -348,6 +354,33 @@ try:
         ex, _ = fresh('http://localhost:8765/index.html#error=access_denied&error_description=Email+link+is+invalid+or+has+expired')
         ex.wait_for_selector('#lg-err:not([hidden])')
         ok('Abgelaufener Link erklärt', 'abgelaufen' in ex.inner_text('#lg-err'))
+        # ---------- Firmenrecherche ----------
+        page.set_viewport_size({'width': 1194, 'height': 834})
+        page.click('text=+ Neuer Kunde'); page.wait_for_selector('#nc-web'); page.fill('#nc-web', 'www.muster-immo.de'); page.click('#newCustBox button[type=submit]')
+        page.wait_for_timeout(1500)
+        page.wait_for_selector('h2:has-text("Vorab recherchiert")', timeout=15000)
+        rc = page.evaluate("()=>[...__rows.values()].map(r=>r.data).find(d=>d.webseite&&d.webseite.includes('muster-immo'))")
+        ok('Recherche füllt Stammdaten (%s)' % rc.get('firma'), rc['firma'] == 'Muster Immobilien GmbH' and rc['ansprechpartner'] == 'Eva Muster' and rc['branche'] == 'Immobilienmakler' and rc['recherche']['kurzprofil'])
+        ok('Zwei Schritte: lesen und auswerten', sum(1 for u, a, d in fncalls if 'research' in u) == 2)
+        page.click('button:has-text("Staffel vorschlagen")'); page.wait_for_timeout(400)
+        rc = page.evaluate("()=>[...__rows.values()].map(r=>r.data).find(d=>d.webseite&&d.webseite.includes('muster-immo'))")
+        ok('Staffel ins Angebot', rc['offer']['staffel'] == 's1')
+        with page.expect_download() as d:
+            page.click('button:has-text("Vorab-Broschüre (PDF)")')
+        bp = T + '/broschuere.pdf'; d.value.save_as(bp); bd = open(bp, 'rb').read()
+        ok('Broschüre als PDF (%d KB)' % (len(bd) // 1024), bd[:4] == b'%PDF')
+        page.click('button:has-text("Broschüre per E-Mail")'); page.wait_for_selector('#bm-ok')
+        page.click('form:has(#bm-ok) >> button:has-text("Senden")'); page.wait_for_timeout(300)
+        ok('Versand nur mit Bestätigung der Zustimmung', 'zugestimmt hat' in page.inner_text('#view') and not any('send-pdf' in u and 'muster' in (d or '') for u, a, d in fncalls))
+        page.check('#bm-ok'); page.click('form:has(#bm-ok) >> button:has-text("Senden")'); page.wait_for_timeout(800)
+        ok('Broschüre gesendet und im Protokoll', any('send-pdf' in u and 'Broschuere' not in (d or '') and 'fuer_Muster' in (d or '') for u, a, d in fncalls))
+        page.screenshot(path=T + '/r-recherche.png', full_page=True)
+        page.click('nav >> text=Fragenkatalog'); page.click('.chip:has-text("Anrufe heute")'); page.wait_for_selector('text=Vorschlag aus der Recherche')
+        page.click('.q:has(#q-q04) >> button:has-text("Übernehmen")'); page.wait_for_timeout(400)
+        ok('Vorschlag übernehmbar, als vorab recherchiert markiert', 'vorab recherchiert' in page.input_value('#q-q04'))
+        page.set_viewport_size({'width': 390, 'height': 844}); page.click('nav >> text=Übersicht') if page.is_visible('nav >> text=Übersicht') else page.click('button.mobile-back'); page.wait_for_timeout(300)
+        sw = page.evaluate('document.documentElement.scrollWidth'); ok('Recherche Handy ohne Querscrollen (%d)' % sw, sw <= 390)
+        page.screenshot(path=T + '/r-recherche-handy.png', full_page=True)
         ok('Keine JS-Fehler ' + '; '.join(errors), not errors)
         b.close()
 finally:
