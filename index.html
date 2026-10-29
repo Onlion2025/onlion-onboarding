@@ -40,7 +40,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 .brand{display:block;text-decoration:none;border-radius:10px}
 .brand:hover img{opacity:.85}
 .brand img{width:150px;display:block}
-.brand .prod{color:var(--accent-ink);font-weight:600;font-size:15px;margin-top:6px}
+.navbtn.prod-on{background:var(--panel2);font-weight:600}.navbtn .pchip{font-size:11px;font-weight:600;border:1px solid var(--line-strong);border-radius:999px;padding:1px 7px;margin-left:6px;color:var(--muted)}
 .label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .group{display:flex;flex-direction:column;gap:6px}
 .navbtn{display:block;width:100%;text-align:left;min-height:44px;padding:10px 12px;border-radius:10px;border:0;background:transparent;color:var(--fg);cursor:pointer}
@@ -191,7 +191,7 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
   .split{grid-template-columns:minmax(0,1fr)}.paper{max-height:none}
   .app{flex-direction:column;flex-wrap:nowrap}
   .side{max-width:none;flex:none;border-right:0;border-bottom:1px solid var(--line);padding-block:14px;gap:12px}
-  .brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.brand img{width:112px}.brand .prod{margin-top:0;font-size:14px}
+  .brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.brand img{width:112px}
   .side .label{display:none}
   #flowNav{display:none!important}
   #custList{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
@@ -210,7 +210,7 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
 <div class="login" id="login" hidden>
   <form class="card login-card" id="loginForm">
     <img src="logo-black.png" alt="ONLION" style="width:170px">
-    <div class="eyebrow" style="color:var(--accent-ink);font-weight:600">KI-Telefon-Agent · Onboarding</div>
+    <div class="eyebrow" style="color:var(--accent-ink);font-weight:600">Onboarding &amp; Vertrieb</div>
     <div class="field"><label for="lg-mail">E-Mail</label><input type="email" id="lg-mail" autocomplete="username" required></div>
     <div class="field"><label for="lg-pw">Passwort</label><input type="password" id="lg-pw" autocomplete="current-password" required></div>
     <div id="lg-err" class="banner warn" hidden></div>
@@ -230,14 +230,18 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
 </div>
 <div class="app">
   <nav class="side" aria-label="Navigation">
-    <a class="brand" id="homeLink" href="#" aria-label="ONLION – zur Startseite (Dashboard)"><img src="logo-black.png" alt="ONLION"><div class="prod" id="prodName">KI-Telefon-Agent</div></a>
+    <a class="brand" id="homeLink" href="#" aria-label="ONLION – zur Startseite (Dashboard)"><img src="logo-black.png" alt="ONLION"></a>
     <div class="group settings" id="dashGroup">
       <div class="label">Überblick</div>
       <button class="navbtn" id="navDash" type="button">Dashboard</button>
       <button class="navbtn" id="navVertrieb" type="button" hidden>Vertrieb</button>
     </div>
+    <div class="group" id="prodGroup">
+      <div class="label">Produkte</div>
+      <div id="prodList"></div>
+    </div>
     <div class="group" id="custGroup">
-      <div class="label">Kunden</div>
+      <div class="label" id="custLabel">Kunden</div>
       <div id="custList"></div>
       <div id="newCustBox"></div>
     </div>
@@ -247,7 +251,7 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
     </div>
     <div class="group settings">
       <div class="label">Einstellungen</div>
-      <button class="navbtn" id="navTpl" type="button">Vorlagen &amp; Rechtstexte</button>
+      <button class="navbtn" id="navTpl" type="button">Produkte &amp; Vorlagen</button>
       <button class="navbtn" id="navKonto" type="button">Konto &amp; Team</button>
       <button class="navbtn" id="logoutBtn" type="button">Abmelden</button>
     </div>
@@ -261,7 +265,9 @@ canvas.pad{width:100%;height:170px;background:#ffffff;border:1px solid var(--lin
 <script src="config.js"></script>
 <script>
 (function(){
-const TPL_ID='ki-telefon-agent', LEGAL_ID='ki-telefon-agent';
+const DEF_PID='ki-telefon-agent';
+const DEF_BESCHR='KI-Assistent, der eingehende Anrufe annimmt, Anliegen aufnimmt, Termine vereinbart und an das Team weiterleitet.';
+const PROD_STATUS={entwurf:'Entwurf',aktiv:'Aktiv'};
 const STAGES=[
   {id:'fragen',t:'Fragenkatalog'},
   {id:'datenschutz',t:'Datenschutz & AVV'},
@@ -270,7 +276,7 @@ const STAGES=[
   {id:'angebot',t:'Angebot'}
 ];
 const STORAGE_OPTS=['Nur als Text, 90 Tage','Audio und Text, 30 Tage','Nicht speichern'];
-const SETTINGS=['vorlagen','konto','dashboard','vertrieb'];
+const SETTINGS=['produkte','konto','dashboard','vertrieb','produkt'];
 const CRM=[
   {id:'neu',t:'Neu'},
   {id:'angerufen',t:'Angerufen'},
@@ -281,7 +287,7 @@ const CRM=[
 ];
 const CRM_RANK={neu:0,angerufen:1,termin:2,unterschrieben:3,abgeschlossen:4};
 const QUELLEN=['Empfehlung','Event','Kaltakquise','Website','Social Media','Bestandskunde','Sonstiges'];
-const S={me:null,team:[],blocked:false,leadsales:[],prov:[],zahl:[],gs:[],vorschl:[],cfg:null,struct:[],db:null,dl:null,customers:[],tpl:null,legal:null,curId:null,view:'start',section:0,newOpen:false,loaded:false,pendingRender:false,confirm:null,pads:{}};
+const S={me:null,team:[],blocked:false,leadsales:[],prov:[],zahl:[],gs:[],vorschl:[],cfg:null,struct:[],db:null,dl:null,customers:[],tpls:{},legals:{},produkte:null,prod:DEF_PID,prodEdit:null,prodTab:'daten',curId:null,view:'start',section:0,newOpen:false,loaded:false,pendingRender:false,confirm:null,pads:{}};
 
 function h(tag,attrs,...kids){
   const el=document.createElement(tag);
@@ -300,9 +306,28 @@ function h(tag,attrs,...kids){
 }
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2600);}
 function cur(){return S.customers.find(c=>c.id===S.curId)||null;}
-function allQs(){return S.tpl?S.tpl.sections.flatMap(s=>s.questions):[];}
+/* ---------- Produkte ----------
+   Jeder Kunde gehört zu genau einem Produkt (c.produkt, ältere Akten = KI-Telefon-Agent).
+   Fragenkatalog und Rechtstexte liegen je Produkt in templates/<id> und legal/<id>; S.tpl/S.legal zeigen auf das aktuelle Produkt (S.prod). */
+Object.defineProperty(S,'tpl',{get(){return S.tpls[S.prod]||null;},set(v){S.tpls[S.prod]=v;}});
+Object.defineProperty(S,'legal',{get(){return S.legals[S.prod]||null;},set(v){S.legals[S.prod]=v;}});
+function pidOf(c){return (c&&c.produkt)||DEF_PID;}
+function inProd(pid,fn){const o=S.prod;S.prod=pid||DEF_PID;try{return fn();}finally{S.prod=o;}}
+function prodAll(){const l=(S.produkte&&Array.isArray(S.produkte.items))?S.produkte.items.slice():[];if(!l.some(p=>p.id===DEF_PID))l.unshift({id:DEF_PID,name:'KI-Telefon-Agent',status:'aktiv',beschreibung:DEF_BESCHR});return l;}
+function prodById(id){return prodAll().find(p=>p.id===id)||null;}
+function prodName(id){const p=prodById(id||DEF_PID);return p?p.name:'Produkt';}
+function isPhone(pid){return (pid||DEF_PID)===DEF_PID||!!(prodById(pid)||{}).telefon;}
+/* im Menü: ONLION sieht alle, Partner nur aktive Produkte */
+function prodNav(){return prodAll().filter(p=>isAdmin()||p.status!=='entwurf');}
+function staffelnOf(pid){pid=pid||DEF_PID;if(pid===DEF_PID)return cfg().staffeln;const p=prodById(pid);return (p&&Array.isArray(p.staffeln))?p.staffeln:[];}
+function allStaffeln(){return prodAll().flatMap(p=>staffelnOf(p.id).map(s=>Object.assign({},s,{pid:p.id,pname:p.name})));}
+function staffelById(id){return allStaffeln().find(s=>s.id===id)||null;}
+function prodRates(pid){const p=prodById(pid||DEF_PID);return p&&p.rates?p.rates:null;}
+function saveProdukte(items){S.produkte={items};return S.db.doc('config/produkte').set({items});}
+function custOf(pid){return S.customers.filter(c=>pidOf(c)===pid);}
+function allQs(){return S.tpl&&Array.isArray(S.tpl.sections)?S.tpl.sections.flatMap(s=>s.questions||[]):[];}
 /* Echte Antwort: mind. 3 Zeichen, kein Platzhalter wie „.“, „x“, „-“, „???“, „aaa“ */
-const LEAD_TEXT_DEFAULT='Ich bin einverstanden, dass ONLION die Kontaktdaten meines Unternehmens (Firma, Branche, Anschrift, Ansprechpartner, E-Mail, Telefon) an Unternehmen aus den Bereichen Telekommunikation, IT und Software, Marketing sowie Unternehmensberatung weitergibt, die mir Angebote für mein Unternehmen per E-Mail und Telefon machen dürfen. Die aktuelle Liste der Empfänger stellt ONLION auf Anfrage zur Verfügung. Die Einwilligung ist freiwillig und unabhängig vom Vertrag über den KI-Telefon-Agenten. Ich kann sie jederzeit ohne Angabe von Gründen gegenüber ONLION widerrufen; die Weitergabe endet dann für die Zukunft.';
+const LEAD_TEXT_DEFAULT='Ich bin einverstanden, dass ONLION die Kontaktdaten meines Unternehmens (Firma, Branche, Anschrift, Ansprechpartner, E-Mail, Telefon) an Unternehmen aus den Bereichen Telekommunikation, IT und Software, Marketing sowie Unternehmensberatung weitergibt, die mir Angebote für mein Unternehmen per E-Mail und Telefon machen dürfen. Die aktuelle Liste der Empfänger stellt ONLION auf Anfrage zur Verfügung. Die Einwilligung ist freiwillig und unabhängig von Verträgen mit ONLION. Ich kann sie jederzeit ohne Angabe von Gründen gegenüber ONLION widerrufen; die Weitergabe endet dann für die Zukunft.';
 function leadText(){return (S.cfg&&S.cfg.leadText)||LEAD_TEXT_DEFAULT;}
 function leadOk(c){const l=c&&c.leadConsent;return !!(l&&l.given&&!l.widerrufenAm);}
 function realAnswer(v){const s=String(v||'').trim();if(!s)return false;
@@ -315,8 +340,8 @@ function realAnswer(v){const s=String(v||'').trim();if(!s)return false;
   return /[a-zA-ZäöüÄÖÜß]/.test(s)&&s.length>=2;}
 function isNA(c,q){return !q.star&&!!(c.na&&c.na[q.id]);}
 function answered(c,q){return realAnswer((c.answers||{})[q.id])||isNA(c,q);}
-function answeredCount(c){return allQs().filter(q=>answered(c,q)).length;}
-function missingQs(c){return allQs().filter(q=>!answered(c,q));}
+function answeredCount(c){return inProd(pidOf(c),()=>allQs().filter(q=>answered(c,q)).length);}
+function missingQs(c){return inProd(pidOf(c),()=>allQs().filter(q=>!answered(c,q)));}
 function legalOk(c){const l=c.legal||{};return !!(l.dsb&&l.speicherung&&l.hinweis&&l.agb);}
 function signed(c){return !!(c&&c.signature&&c.signature.hash);}
 /* CRM: gespeicherter Status; „Unterschrieben“ ergibt sich automatisch aus der Unterschrift */
@@ -337,7 +362,8 @@ function normWeb(v){v=String(v||'').trim();if(!v)return '';if(!/^https?:\/\//i.t
 function webHost(v){try{return new URL(v).hostname.replace(/^www\./,'');}catch(e){return v;}}
 const STAMM_LABEL={firma:'Firma',ansprechpartner:'Ansprechpartner',email:'E-Mail',telefon:'Telefon',adresse:'Adresse',branche:'Branche'};
 const LEGAL_REQ=['dsb','speicherung','hinweis','agb'];
-function progress(c){
+function progress(c){return inProd(pidOf(c),()=>progress0(c));}
+function progress0(c){
   const l=c.legal||{},qs=allQs(),has=q=>answered(c,q);
   const stars=qs.filter(q=>q.star);
   const qDone=qs.filter(has).length,sDone=stars.filter(has).length;
@@ -366,7 +392,7 @@ function progressEl(c,compact){const box=h('div',{class:compact?'prog-mini':'car
 function updateProgress(){const c=cur();if(!c||!S.progEls)return;for(const e of S.progEls)if(e.id===c.id)fillProgress(e.box,c,e.compact);}
 
 function stageState(c,id){
-  const total=allQs().length,n=answeredCount(c);
+  const total=inProd(pidOf(c),()=>allQs().length),n=answeredCount(c);
   if(id==='fragen')return total&&n===total?'done':(n?'now':'open');
   if(id==='datenschutz')return legalOk(c)?'done':((c.legal&&Object.keys(c.legal).length)?'now':'open');
   if(id==='unterschrift')return signed(c)?'done':'open';
@@ -409,16 +435,23 @@ function flushAll(){const ps=[];for(const k in timers){clearTimeout(timers[k].t)
 async function createCustomer(data){
   const now=new Date().toISOString();
   const ref=S.db.collection('customers').doc();
-  await ref.set(Object.assign({product:'KI-Telefon-Agent',templateId:TPL_ID,answers:{},legal:{},crm:{status:'neu',history:[{s:'neu',at:now,by:(S.me&&S.me.email)||''}]},createdAt:now,updatedAt:now},(S.me&&S.me.role==='partner')?{partner:S.me.email}:{},data));
+  const pid=data.produkt||S.prod||DEF_PID;delete data.produkt;
+  await ref.set(Object.assign({produkt:pid,product:prodName(pid),templateId:pid,answers:{},legal:{},crm:{status:'neu',history:[{s:'neu',at:now,by:(S.me&&S.me.email)||''}]},createdAt:now,updatedAt:now},(S.me&&S.me.role==='partner')?{partner:S.me.email}:{},data));
   S.curId=ref.id;S.view='start';S.newOpen=false;render();
   return ref.id;
 }
 
 /* ---------- sidebar ---------- */
 function renderSide(){
+  // Produkte: aktives Produkt hervorgehoben, darunter dessen Kunden
+  const nav=prodNav();if(!nav.some(p=>p.id===S.prod)&&nav.length)S.prod=nav[0].id;
+  const pl=document.getElementById('prodList');pl.replaceChildren();
+  for(const p of nav)pl.append(h('button',{type:'button',class:'navbtn'+(p.id===S.prod?' prod-on':'')+(S.view==='produkt'&&p.id===S.prod?' on':''),'aria-current':p.id===S.prod?'true':null,onclick:()=>{S.prod=p.id;S.view='produkt';S.newOpen=false;S.confirm=null;render();window.scrollTo(0,0);}},p.name,p.status==='entwurf'?h('span',{class:'pchip'},'Entwurf'):null,h('small',null,custOf(p.id).length===1?'1 Kunde':custOf(p.id).length+' Kunden')));
+  document.getElementById('custLabel').textContent='Kunden · '+prodName(S.prod);
   const list=document.getElementById('custList');list.replaceChildren();
   if(!S.loaded)list.append(h('div',{class:'eyebrow',text:'Lade Kunden …'}));
-  for(const c of S.customers){
+  else if(!custOf(S.prod).length)list.append(h('div',{class:'eyebrow',text:'Noch keine Kunden für dieses Produkt.'}));
+  for(const c of custOf(S.prod)){
     list.append(h('button',{type:'button',class:'navbtn'+(c.id===S.curId&&!SETTINGS.includes(S.view)?' on':''),onclick:()=>{S.curId=c.id;S.view='start';render();}},c.firma||'Ohne Namen',h('small',null,statT(stat(c))+(stat(c)==='neu'||stat(c)==='angerufen'||stat(c)==='termin'?' · '+progress(c).pct+' % erfasst':''))));
   }
   const nb=document.getElementById('newCustBox');nb.replaceChildren();
@@ -427,8 +460,8 @@ function renderSide(){
   else{
     const form=h('form',{class:'card',style:'padding:14px;gap:10px',onsubmit:async e=>{e.preventDefault();const v=document.getElementById('nc-firma').value.trim(),w=normWeb(document.getElementById('nc-web').value);
         if(!v&&!w){toast('Bitte Firma oder Webseite eintragen.');return;}
-        const id=await createCustomer(Object.assign({firma:v||webHost(w)},w?{webseite:w}:{}));
-        if(w&&id)runResearch({id,webseite:w});}},
+        const id=await createCustomer(Object.assign({firma:v||webHost(w),produkt:S.prod},w?{webseite:w}:{}));
+        if(w&&id)runResearch({id,webseite:w,produkt:S.prod});}},
       h('div',{class:'field'},h('label',{for:'nc-firma'},'Firma'),h('input',{type:'text',id:'nc-firma',autocomplete:'organization'})),
       h('div',{class:'field'},h('label',{for:'nc-web'},'Webseite (optional, für die Recherche)'),h('input',{type:'text',id:'nc-web',inputmode:'url',autocapitalize:'off',spellcheck:'false',placeholder:'www.beispiel.de',autocomplete:'url'})),
       h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Anlegen'),h('button',{type:'button',class:'btn',onclick:()=>{S.newOpen=false;renderSide();}},'Abbrechen')));
@@ -443,7 +476,7 @@ function renderSide(){
       fl.append(h('button',{type:'button',class:'navbtn'+(S.view===st.id?' on':''),disabled:state==='locked',onclick:()=>{S.view=st.id;render();}},h('span',{class:'step'},h('span',{class:'dot '+(state==='done'?'done':state==='now'?'now':'')}),(i+1)+' · '+st.t)));
     });
   }
-  document.getElementById('navTpl').className='navbtn'+(S.view==='vorlagen'?' on':'');
+  document.getElementById('navTpl').className='navbtn'+(S.view==='produkte'?' on':'');document.getElementById('prodGroup').hidden=S.blocked;
   document.getElementById('navKonto').className='navbtn'+(S.view==='konto'?' on':'');
   document.getElementById('navDash').className='navbtn'+(S.view==='dashboard'?' on':'');document.getElementById('dashGroup').hidden=S.blocked;
   document.getElementById('custGroup').hidden=S.blocked;
@@ -454,9 +487,9 @@ function renderSide(){
 /* ---------- views ---------- */
 function viewEmpty(){
   return h('div',{class:'empty'},
-    h('h1',null,'KI-Telefon-Agent · Kundenaufnahme'),
+    h('h1',null,prodName(S.prod)+' · Kundenaufnahme'),
     h('p',{style:'margin:0;max-width:60ch'},'Hier entstehen deine Kundenakten: Fragenkatalog, Datenschutz, Unterschrift und PDF. Lege links mit „Neuer Kunde“ den ersten Kunden an.'),
-    !S.tpl&&S.loaded?h('div',{class:'banner warn'},'Die Vorlage „KI-Telefon-Agent“ fehlt noch. Ohne sie gibt es keine Fragen.'):null);
+    !S.tpl&&S.loaded?h('div',{class:'banner warn'},'Der Fragenkatalog für „'+prodName(S.prod)+'“ fehlt noch. Ohne ihn gibt es keine Fragen.'):null);
 }
 function header(c,title){
   return h('div',{class:'row',style:'align-items:flex-end'},
@@ -492,7 +525,7 @@ function viewStart(c){
     :h('button',{type:'button',class:'btn danger',onclick:()=>{S.confirm='del'+c.id;render();}},'Kundenakte löschen');
   const next=STAGES.find(st=>stageState(c,st.id)!=='done'&&stageState(c,st.id)!=='locked');
   return [
-    h('div',{class:'row',style:'align-items:flex-end'},h('div',null,h('div',{class:'eyebrow'},'KI-Telefon-Agent'),h('h1',null,c.firma||'Ohne Namen')),h('div',{class:'spacer'}),
+    h('div',{class:'row',style:'align-items:flex-end'},h('div',null,h('div',{class:'eyebrow'},prodName(pidOf(c))),h('h1',null,c.firma||'Ohne Namen')),h('div',{class:'spacer'}),
       next?h('button',{type:'button',class:'btn primary',onclick:()=>{S.view=next.id;render();}},'Weiter: '+next.t):null),
     stamm,researchCard(c),crmCard(c),payCard(c),progressEl(c,false),stages,isAdmin()?h('div',{class:'row'},del):null];
 }
@@ -500,7 +533,7 @@ function viewStart(c){
 function viewFragen(c){
   if(!S.tpl)return [header(c,'Fragenkatalog'),viewEmpty()];
   const secs=S.tpl.sections, si=Math.min(S.section,secs.length-1), sec=secs[si], a=c.answers||{}, ro=signed(c);
-  const total=allQs().length,n=answeredCount(c);
+  const total=inProd(pidOf(c),()=>allQs().length),n=answeredCount(c);
   const chips=h('div',{class:'chips',role:'tablist'});
   secs.forEach((s,i)=>chips.append(h('button',{type:'button',role:'tab','aria-selected':i===si?'true':'false',class:'chip'+(i===si?' on':''),onclick:()=>{S.section=i;render();}},s.title)));
   const qs=sec.questions.map((q,qi)=>{
@@ -515,7 +548,7 @@ function viewFragen(c){
           q.star?null:h('label',{class:'check',style:'min-height:36px;padding-block:2px;font-size:14px'},h('input',{type:'checkbox',id:'qna-'+q.id,disabled:ro,checked:na,onchange:e=>{const p={na:{}};p.na[q.id]=e.target.checked;saveCust(c.id,p,0);render._force=true;render();}}),'Entfällt für diesen Kunden')];})());
   });
   return [
-    h('div',{class:'row',style:'align-items:flex-end'},h('div',null,h('div',{class:'eyebrow'},c.firma+' · KI-Telefon-Agent'),h('h1',null,'Fragenkatalog')),h('div',{class:'spacer'}),
+    h('div',{class:'row',style:'align-items:flex-end'},h('div',null,h('div',{class:'eyebrow'},c.firma+' · '+prodName(pidOf(c))),h('h1',null,'Fragenkatalog')),h('div',{class:'spacer'}),
       h('div',{class:'row'},h('span',{class:'eyebrow tabnum'},n+' von '+total+' beantwortet'),h('div',{class:'progress','aria-hidden':'true'},h('div',{style:'width:'+(total?Math.round(n/total*100):0)+'%'})))),
     lockedBanner(c),progressEl(c,true),chips,...qs,
     h('div',{class:'row'},h('span',{class:'eyebrow'},'★ = Pflichtfrage · andere Fragen: Antwort oder „Entfällt“ · wird automatisch gespeichert'),h('div',{class:'spacer'}),
@@ -548,7 +581,7 @@ function viewDatenschutz(c){
     h('div',{class:'field'},h('label',{for:'l-notiz'},'Besondere Vereinbarungen'),h('textarea',{id:'l-notiz',value:l.notiz||'',disabled:ro,oninput:e=>set('notiz',e.target.value)})),
     legalOk(c)?h('div',{class:'banner ok'},'Alle Pflichtangaben sind erfasst.'):h('div',{class:'banner info'},'Pflicht: Datenschutzbeauftragter, Speicherung, Hinweis an Anrufer, AGB erhalten.'),
     h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>{S.view='fragen';render();}},'Zurück'),h('div',{class:'spacer'}),h('button',{type:'button',class:'btn primary',onclick:()=>{S.view='unterschrift';render();window.scrollTo(0,0);}},'Zur Unterschrift')));
-  return [h('div',null,h('div',{class:'eyebrow'},c.firma+' · KI-Telefon-Agent'),h('h1',null,'Datenschutz & AVV')),lockedBanner(c),progressEl(c,true),h('div',{class:'split'},form,preview)];
+  return [h('div',null,h('div',{class:'eyebrow'},c.firma+' · '+prodName(pidOf(c))),h('h1',null,'Datenschutz & AVV')),lockedBanner(c),progressEl(c,true),h('div',{class:'split'},form,preview)];
 }
 
 /* signature pads */
@@ -661,7 +694,7 @@ async function buildPdf(c){
   const firma=T(c.firma)||'Ohne Namen';
   const head=()=>{
     if(logo)doc.addImage(logo,'PNG',M,11,30,6.2,'logo','FAST');
-    font(8);col(MUT);doc.text(clean('KI-Telefon-Agent · Kundenaufnahme'),W-M,13.5,{align:'right'});
+    font(8);col(MUT);doc.text(clean(prodName(pidOf(c))+' · Kundenaufnahme'),W-M,13.5,{align:'right'});
     doc.text(clean(firma),W-M,17.5,{align:'right'});
     doc.setDrawColor(...LINE);doc.setLineWidth(0.2);doc.line(M,22,W-M,22);
     doc.setDrawColor(...LIME);doc.setLineWidth(1.2);doc.line(M,22,M+18,22);
@@ -763,7 +796,7 @@ async function buildPdf(c){
   } else lines(wrap('Noch nicht unterschrieben.',10,'italic'),10,'italic',MUT,M,2);
 
   const pages=doc.getNumberOfPages();
-  for(let i=1;i<=pages;i++){doc.setPage(i);doc.setDrawColor(...LINE);doc.setLineWidth(0.2);doc.line(M,283,W-M,283);font(7.5);col(MUT);doc.text(clean('ONLION · KI-Telefon-Agent · Rechtstexte sind Entwürfe, vor Einsatz prüfen lassen'),M,288);doc.text('Seite '+i+' von '+pages,W-M,288,{align:'right'});}
+  for(let i=1;i<=pages;i++){doc.setPage(i);doc.setDrawColor(...LINE);doc.setLineWidth(0.2);doc.line(M,283,W-M,283);font(7.5);col(MUT);doc.text(clean('ONLION · '+prodName(pidOf(c))+' · Rechtstexte sind Entwürfe, vor Einsatz prüfen lassen'),M,288);doc.text('Seite '+i+' von '+pages,W-M,288,{align:'right'});}
   return doc.output('blob');
 }
 function blobToBase64(blob){return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(',')[1]);fr.onerror=rej;fr.readAsDataURL(blob);});}
@@ -776,7 +809,7 @@ async function callFn(name,payload){
   if(!r.ok)throw new Error(t.error||('Fehler '+r.status));
   return t;
 }
-function pdfName(c){return ('ONLION_KI-Telefon-Agent_'+(c.firma||'Kunde')).replace(/[^\wäöüÄÖÜß.-]+/g,'_')+'.pdf';}
+function pdfName(c){return ('ONLION_'+prodName(pidOf(c))+'_'+(c.firma||'Kunde')).replace(/[^\wäöüÄÖÜß.-]+/g,'_')+'.pdf';}
 function viewPdf(c){
   const status=h('div',{class:'eyebrow'});
   const btn=h('button',{type:'button',class:'btn',onclick:async()=>{
@@ -810,8 +843,8 @@ function viewPdf(c){
     ?h('section',{class:'card','aria-label':'E-Mail'},h('h2',null,'Per E-Mail senden'),
       h('div',{class:'grid2'},
         h('div',{class:'field'},h('label',{for:'m-to'},'An'),h('input',{type:'email',id:'m-to',value:c.email||'',autocomplete:'off'})),
-        h('div',{class:'field'},h('label',{for:'m-subj'},'Betreff'),h('input',{type:'text',id:'m-subj',value:'Zusammenfassung KI-Telefon-Agent – '+(c.firma||'')}))),
-      h('div',{class:'field'},h('label',{for:'m-msg'},'Nachricht'),h('textarea',{id:'m-msg',style:'min-height:150px',value:greet+'\n\nanbei die Zusammenfassung unseres Gesprächs zum KI-Telefon-Agent mit Fragenkatalog, Datenschutz-Angaben und Vereinbarung zur Auftragsverarbeitung.\n\nViele Grüße\nIhr ONLION-Team'})),
+        h('div',{class:'field'},h('label',{for:'m-subj'},'Betreff'),h('input',{type:'text',id:'m-subj',value:'Zusammenfassung '+prodName(pidOf(c))+' – '+(c.firma||'')}))),
+      h('div',{class:'field'},h('label',{for:'m-msg'},'Nachricht'),h('textarea',{id:'m-msg',style:'min-height:150px',value:greet+'\n\nanbei die Zusammenfassung unseres Gesprächs zu '+prodName(pidOf(c))+' mit Fragenkatalog, Datenschutz-Angaben und Vereinbarung zur Auftragsverarbeitung.\n\nViele Grüße\nIhr ONLION-Team'})),
       h('div',{class:'row'},send,mailStatus),
       c.sentAt?h('div',{class:'eyebrow'},'Zuletzt gesendet am '+fmtDate(c.sentAt)+' an '+(c.sentTo||'')):null)
     :h('div',{class:'banner info'},'Der Versand per E-Mail ist in der eigenständigen App verfügbar. Hier das PDF speichern und aus Outlook verschicken.');
@@ -821,11 +854,6 @@ function viewPdf(c){
     h('div',{class:'card'},h('h2',null,'Nur speichern'),h('div',{class:'row'},btn,status),c.pdfAt?h('div',{class:'eyebrow'},'Zuletzt erstellt: '+fmtDate(c.pdfAt)):null)];
 }
 
-const PRESETS=[
-  {name:'Potenzialanalyse KI-Telefon-Agent',qty:1,unit:'Pauschal',price:3500},
-  {name:'Pilot KI-Telefon-Agent (4–6 Wochen)',qty:1,unit:'Pauschal',price:9500},
-  {name:'Betrieb KI-Telefon-Agent',qty:1,unit:'Monat',price:2500}
-];
 const eur=n=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(n||0);
 function offerTotals(items){const net=items.reduce((s,i)=>s+(Number(i.qty)||0)*(Number(i.price)||0),0);const vat=Math.round(net*19)/100;return {net,vat,gross:net+vat};}
 function viewAngebot(c){
@@ -848,39 +876,146 @@ function viewAngebot(c){
       h('button',{type:'button',class:'btn','aria-label':'Position entfernen',onclick:()=>{items.splice(i,1);saveCust(c.id,{offer:{items:JSON.parse(JSON.stringify(items))}},0);render._force=true;render();}},'Entfernen')));
   });
   const addPreset=p=>{items.push(Object.assign({},p));saveCust(c.id,{offer:{items:JSON.parse(JSON.stringify(items))}},0);render._force=true;render();};
-  return [h('div',null,h('div',{class:'eyebrow'},c.firma+' · KI-Telefon-Agent'),h('h1',null,'Angebot')),
+  return [h('div',null,h('div',{class:'eyebrow'},c.firma+' · '+prodName(pidOf(c))),h('h1',null,'Angebot')),
     h('section',{class:'card'},h('h2',null,'Positionen'),
-      staffelChips(c,items,st=>{const keep=items.filter(i=>i.kind!=='einrichtung'&&i.kind!=='lizenz');const n=staffelItems(st).concat(keep);saveCust(c.id,{offer:{items:n,staffel:st.id}},0);toast(st.individuell?'Preis bitte eintragen':'Staffel übernommen');render._force=true;render();}),
+      staffelChips(c,items,st=>{const keep=items.filter(i=>i.kind!=='einrichtung'&&i.kind!=='lizenz');const n=staffelItems(st,pidOf(c)).concat(keep);saveCust(c.id,{offer:{items:n,staffel:st.id}},0);toast(st.individuell?'Preis bitte eintragen':'Staffel übernommen');render._force=true;render();}),
       items.length?rows:h('div',{class:'eyebrow'},'Noch keine Positionen. Oben die Preisstaffel nach Firmengröße wählen.'),
       h('div',{class:'chips'},h('button',{type:'button',class:'chip',onclick:()=>addPreset({name:'Neue Position',qty:1,unit:'Stück',price:0})},'+ Freie Position')),
       totals,
       h('div',{class:'eyebrow'},'Kalkulation für das Gespräch. Das verbindliche Angebot und die Rechnung erstellst du später in deinem Buchhaltungsprogramm.'))];
 }
 
-/* templates */
-let tplTimer;
-function saveTpl(){clearTimeout(tplTimer);tplTimer=setTimeout(()=>{S.db.doc('templates/'+TPL_ID).set(S.tpl).catch(e=>toast('Nicht gespeichert: '+e.message));},500);}
-function viewVorlagen(){
-  const out=[h('div',null,h('div',{class:'eyebrow'},'Einstellungen'),h('h1',null,'Vorlagen & Rechtstexte'))];
-  if(!S.tpl){out.push(viewEmpty());return out;}
-  out.push(h('div',{class:'banner info'},'Änderungen gelten für alle Kunden. Bereits unterschriebene Akten behalten ihre Prüfsumme; ihr PDF zeigt aber die aktuelle Fassung der Fragen.'));
-  S.tpl.sections.forEach((s,si)=>{
-    const card=h('section',{class:'card'},h('div',{class:'field'},h('label',{for:'ts-'+si},'Abschnitt'),h('input',{type:'text',id:'ts-'+si,value:s.title,oninput:e=>{s.title=e.target.value;saveTpl();}})));
+/* ---------- Produkte: Übersicht je Produkt und Verwaltung (Einstellungen) ---------- */
+const tplTimers={};
+function saveTpl(pid){clearTimeout(tplTimers[pid]);tplTimers[pid]=setTimeout(()=>{S.db.doc('templates/'+pid).set(S.tpls[pid]).catch(e=>toast('Nicht gespeichert: '+e.message));},500);}
+function prodSlug(n){return String(n||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/ß/g,'ss').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);}
+function updProd(pid,patch){return saveProdukte(prodAll().map(x=>x.id===pid?Object.assign({},x,patch):x));}
+async function createProduct(name,src){
+  const base=prodSlug(name)||'produkt';let id=base,i=2;while(prodById(id)||id===DEF_PID&&base!==DEF_PID)id=base+'-'+(i++);
+  const sp=prodById(src)||prodById(DEF_PID);
+  const np={id,name,status:'entwurf',beschreibung:sp.id===DEF_PID?'':(sp.beschreibung||''),telefon:false,
+    staffeln:staffelnOf(sp.id).map((x,k)=>Object.assign({},x,{id:id+'-s'+(k+1)})),rates:sp.rates?JSON.parse(JSON.stringify(sp.rates)):null,from:sp.id,createdAt:new Date().toISOString()};
+  const t=S.tpls[sp.id],l=S.legals[sp.id];
+  if(t){S.tpls[id]=Object.assign(JSON.parse(JSON.stringify(t)),{name,product:name});await S.db.doc('templates/'+id).set(S.tpls[id]);}
+  if(l){S.legals[id]=JSON.parse(JSON.stringify(l));await S.db.doc('legal/'+id).set(S.legals[id]);}
+  await saveProdukte(prodAll().concat([np]));
+  return id;
+}
+function viewProdukt(pid){
+  const p=prodById(pid)||{id:pid,name:prodName(pid)};const cs=custOf(pid).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+  const n=st=>cs.filter(c=>st.includes(stat(c))).length;
+  const open=c=>{S.curId=c.id;S.view='start';render();window.scrollTo(0,0);};
+  const tb=h('tbody');
+  for(const c of cs)tb.append(h('tr',{class:'clk',tabindex:'0',onclick:()=>open(c),onkeydown:e=>{if(e.key==='Enter')open(c);}},
+    h('td',null,h('strong',null,c.firma||'Ohne Namen')),h('td',null,statEl(stat(c))),
+    h('td',{class:'hide-m tabnum'},progress(c).pct+' %'),
+    h('td',{class:'num'+(offerNet(c)?'':' hide-m')},offerNet(c)?eur(offerNet(c)):'–')));
+  const st=staffelnOf(pid);
+  return [
+    h('div',{class:'row',style:'align-items:flex-end'},h('div',null,h('div',{class:'eyebrow'},'Produkt'+(p.status==='entwurf'?' · Entwurf':'')),h('h1',null,p.name)),h('div',{class:'spacer'}),
+      S.db?h('button',{type:'button',class:'btn primary',onclick:()=>{S.newOpen=true;renderSide();setTimeout(()=>{const f=document.getElementById('nc-firma');if(f){f.scrollIntoView({block:'center'});f.focus();}},0);}},'+ Neuer Kunde'):null,
+      isAdmin()?h('button',{type:'button',class:'btn',onclick:()=>{S.view='produkte';S.prodEdit=pid;S.prodTab='daten';render();window.scrollTo(0,0);}},'Produkt bearbeiten'):null),
+    p.beschreibung?h('p',{style:'margin:0;max-width:70ch'},p.beschreibung):null,
+    p.status==='entwurf'?h('div',{class:'banner warn'},'Entwurf: Nur ONLION sieht dieses Produkt. Unter Einstellungen → Produkte & Vorlagen auf „Aktiv“ stellen, dann können Vertriebspartner es verkaufen.'):null,
+    h('div',{class:'kpis'},kpiTile('Kunden',String(cs.length),''),kpiTile('In Arbeit',String(n(['neu','angerufen','termin'])),'neu, angerufen, Termin'),kpiTile('Unterschrieben',String(n(['unterschrieben'])),''),kpiTile('Abgeschlossen',String(n(['abgeschlossen'])),'',true)),
+    st.length?h('section',{class:'card'},h('h2',null,'Preise'),h('div',{class:'chips'},...st.map(x=>h('span',{class:'chip',style:'display:inline-flex;align-items:center;cursor:default'},x.label+(x.individuell?' · individuell':' · '+eur0(x.einrichtung)+' + '+eur0(x.lizenz)+'/Monat'))))):null,
+    h('section',{class:'card'},h('h2',null,'Kunden'),cs.length?h('table',{class:'ctable'},h('thead',null,h('tr',null,h('th',null,'Kunde'),h('th',null,'Status'),h('th',{class:'hide-m'},'Erfasst'),h('th',{class:'num'},'Angebot netto'))),tb):h('div',{class:'eyebrow'},'Noch keine Kunden. Mit „+ Neuer Kunde“ den ersten anlegen.'))];
+}
+const PROD_TABS=[['daten','Grunddaten'],['preise','Preise'],['provision','Provision'],['fragen','Fragenkatalog'],['recht','Rechtstexte']];
+function viewProdukte(){
+  const items=prodAll();const pid=prodById(S.prodEdit)?S.prodEdit:(prodById(S.prod)?S.prod:DEF_PID);S.prodEdit=pid;const p=prodById(pid);
+  const out=[h('div',null,h('div',{class:'eyebrow'},'Einstellungen'),h('h1',null,'Produkte & Vorlagen'))];
+  const nf=S.newProd;
+  out.push(h('section',{class:'card'},h('h2',null,'Produkte'),
+    h('div',{class:'chips'},...items.map(x=>h('button',{type:'button',class:'chip'+(x.id===pid?' on':''),'aria-pressed':x.id===pid?'true':'false',onclick:()=>{S.prodEdit=x.id;S.confirm=null;render();}},x.name+(x.status==='entwurf'?' · Entwurf':'')))),
+    !nf?h('div',{class:'row'},h('button',{type:'button',class:'btn ghost-dashed',onclick:()=>{S.newProd={src:pid};render();}},'+ Neues Produkt'))
+    :h('form',{class:'card',style:'background:var(--panel2)',onsubmit:async e=>{e.preventDefault();const name=document.getElementById('np-name').value.trim();if(!name){toast('Bitte einen Namen eintragen.');return;}
+        if(items.some(x=>x.name.toLowerCase()===name.toLowerCase())){toast('Dieses Produkt gibt es schon.');return;}
+        const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
+        try{const id=await createProduct(name,document.getElementById('np-src').value);S.newProd=null;S.prodEdit=id;S.prodTab='daten';toast('Produkt „'+name+'“ als Entwurf angelegt');render();}catch(err){btn.disabled=false;toast('Anlegen fehlgeschlagen: '+err.message);}}},
+      h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'np-name'},'Name des Produkts'),h('input',{type:'text',id:'np-name',placeholder:'z. B. KI-Chat-Assistent'})),
+        h('div',{class:'field'},h('label',{for:'np-src'},'Startpunkt (Kopie von)'),h('select',{id:'np-src'},...items.map(x=>{const o=h('option',{value:x.id},x.name);if(x.id===nf.src)o.selected=true;return o;})))),
+      h('div',{class:'eyebrow'},'Übernommen werden Fragenkatalog, Rechtstexte, Preise und Provisionssätze. Das neue Produkt startet als Entwurf und ist erst nach „Aktiv“ für Vertriebspartner sichtbar.'),
+      h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Anlegen'),h('button',{type:'button',class:'btn',onclick:()=>{S.newProd=null;render();}},'Abbrechen')))));
+  const tab=PROD_TABS.some(t=>t[0]===S.prodTab)?S.prodTab:'daten';
+  out.push(h('div',{class:'chips',role:'tablist','aria-label':'Bereiche'},...PROD_TABS.map(([k,l])=>h('button',{type:'button',role:'tab',class:'chip'+(tab===k?' on':''),'aria-selected':tab===k?'true':'false',onclick:()=>{S.prodTab=k;render();}},l))));
+  out.push(...({daten:prodDaten,preise:prodPreise,provision:prodProvision,fragen:prodFragen,recht:prodRecht}[tab])(p));
+  return out;
+}
+function prodDaten(p){
+  const isDef=p.id===DEF_PID;const n=custOf(p.id).length;
+  const stSel=h('select',{id:'pd-status',disabled:isDef,onchange:async e=>{await updProd(p.id,{status:e.target.value});toast(e.target.value==='aktiv'?'Produkt ist aktiv – Vertriebspartner sehen es jetzt':'Produkt ist Entwurf – nur ONLION sieht es');render();}},...Object.entries(PROD_STATUS).map(([k,t])=>{const o=h('option',{value:k},t);if((p.status||'aktiv')===k)o.selected=true;return o;}));
+  const del=isDef||n?null:(S.confirm==='delprod'+p.id
+    ?h('div',{class:'confirm'},'Produkt „'+p.name+'“ mit Fragenkatalog und Rechtstexten löschen?',h('button',{type:'button',class:'btn danger',onclick:async()=>{await saveProdukte(prodAll().filter(x=>x.id!==p.id));await S.db.doc('templates/'+p.id).delete().catch(()=>{});await S.db.doc('legal/'+p.id).delete().catch(()=>{});delete S.tpls[p.id];delete S.legals[p.id];S.prodEdit=DEF_PID;S.confirm=null;if(S.prod===p.id)S.prod=DEF_PID;toast('Produkt gelöscht');render();}},'Ja, löschen'),h('button',{type:'button',class:'btn',onclick:()=>{S.confirm=null;render();}},'Abbrechen'))
+    :h('div',{class:'row'},h('button',{type:'button',class:'btn danger',onclick:()=>{S.confirm='delprod'+p.id;render();}},'Produkt löschen')));
+  return [h('section',{class:'card'},h('h2',null,'Grunddaten'),
+    h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'pd-name'},'Name'),h('input',{type:'text',id:'pd-name',value:p.name,onchange:async e=>{const v=e.target.value.trim();if(!v){e.target.value=p.name;return;}await updProd(p.id,{name:v});toast('Name gespeichert');render();}})),
+      h('div',{class:'field'},h('label',{for:'pd-status'},'Status'),stSel)),
+    isDef?h('div',{class:'eyebrow'},'Das Hauptprodukt ist immer aktiv.'):h('div',{class:'eyebrow'},'Entwurf: nur ONLION sieht und testet es. Aktiv: alle Vertriebspartner können es verkaufen.'),
+    h('div',{class:'field'},h('label',{for:'pd-beschr'},'Kurzbeschreibung (für Kunden, Recherche und Vorab-Broschüre)'),h('textarea',{id:'pd-beschr',style:'min-height:90px',value:p.beschreibung||(isDef?DEF_BESCHR:''),onchange:async e=>{await updProd(p.id,{beschreibung:e.target.value.trim().slice(0,600)});toast('Beschreibung gespeichert');}})),
+    isDef?null:h('label',{class:'check'},h('input',{type:'checkbox',id:'pd-tel',checked:!!p.telefon,onchange:async e=>{await updProd(p.id,{telefon:e.target.checked});toast('Gespeichert');render();}}),'Telefon-Produkt: Minutenkosten im Kostenmodell, Broschüre mit Begrüßung und Weiterleitungen'),
+    h('div',{class:'eyebrow'},n===1?'1 Kunde nutzt dieses Produkt.':n+' Kunden nutzen dieses Produkt.'+(isDef||n?'':' Produkte ohne Kunden lassen sich löschen.')),
+    del)];
+}
+function prodPreise(p){
+  const st=JSON.parse(JSON.stringify(staffelnOf(p.id)));
+  const rows=h('div',{class:'offer-rows'});
+  const draw=()=>{rows.replaceChildren();st.forEach((s,i)=>rows.append(h('div',{class:'grid2'},
+    h('div',{class:'field'},h('label',{for:'sf-l'+i},'Staffel'),h('input',{type:'text',id:'sf-l'+i,value:s.label,oninput:e=>s.label=e.target.value})),
+    s.individuell?h('div',{class:'eyebrow',style:'align-self:center'},'Preis individuell im Angebot'):h('div',{class:'field'},h('label',{for:'sf-e'+i},'Einrichtung (€)'),h('input',{type:'number',id:'sf-e'+i,min:'0',step:'50',value:String(s.einrichtung||0),oninput:e=>s.einrichtung=Math.max(0,parseFloat(e.target.value)||0)})),
+    s.individuell?null:h('div',{class:'field'},h('label',{for:'sf-m'+i},'Lizenz pro Monat (€)'),h('input',{type:'number',id:'sf-m'+i,min:'0',step:'10',value:String(s.lizenz||0),oninput:e=>s.lizenz=Math.max(0,parseFloat(e.target.value)||0)})),
+    h('div',{class:'row',style:'align-self:end'},h('label',{class:'check'},h('input',{type:'checkbox',checked:!!s.individuell,onchange:e=>{s.individuell=e.target.checked;if(s.individuell){s.einrichtung=0;s.lizenz=0;}draw();}}),'individuell'),
+      st.length>1?h('button',{type:'button',class:'btn','aria-label':'Staffel entfernen',onclick:()=>{st.splice(i,1);draw();}},'Entfernen'):null))));};
+  draw();
+  return [h('section',{class:'card'},h('h2',null,'Preisstaffeln · '+p.name),rows,
+    h('div',{class:'row'},h('button',{type:'button',class:'btn ghost-dashed',onclick:()=>{st.push({id:p.id+'-s'+Date.now().toString(36),label:'Neue Staffel',einrichtung:0,lizenz:0});draw();}},'+ Staffel'),
+      h('button',{type:'button',class:'btn primary',onclick:async()=>{if(st.some(x=>!String(x.label).trim())){toast('Bitte jede Staffel benennen.');return;}if(p.id===DEF_PID)await saveCfg({staffeln:st});else await updProd(p.id,{staffeln:st});toast('Preise gespeichert');render();}},'Speichern')),
+    h('div',{class:'eyebrow'},'Neue Preise gelten für neu gewählte Staffeln im Angebot. Bestehende Angebote bleiben unverändert.'))];
+}
+function prodProvision(p){
+  const std=versionAt(todayStr()).rates||{};const own=!!p.rates;
+  const R=JSON.parse(JSON.stringify(p.rates||std));
+  const L=['Verkäufer','Ebene 1','Ebene 2'];
+  const num=(k,i,unit)=>h('div',{class:'field'},h('label',{for:'pr-'+k+i},L[i]+(unit?' ('+unit+')':'')),h('input',{type:'number',id:'pr-'+k+i,min:'0',max:k==='lizenzMonate'?'120':'100',step:k==='lizenzMonate'?'1':'0.5',disabled:!own,value:String(Number((R[k]||[])[i])||0),oninput:e=>{R[k]=R[k]||[0,0,0];R[k][i]=Math.max(0,parseFloat(e.target.value)||0);}}));
+  return [h('section',{class:'card'},h('h2',null,'Provision · '+p.name),
+    h('div',{class:'chips'},
+      h('button',{type:'button',class:'chip'+(own?'':' on'),'aria-pressed':own?'false':'true',onclick:async()=>{if(!own)return;await updProd(p.id,{rates:null});toast('Es gilt wieder das Standardmodell');render();}},'Standardmodell'),
+      h('button',{type:'button',class:'chip'+(own?' on':''),'aria-pressed':own?'true':'false',onclick:async()=>{if(own)return;await updProd(p.id,{rates:JSON.parse(JSON.stringify(Object.assign({aktivQuartale:std.aktivQuartale||0},std)))});toast('Eigene Sätze angelegt – jetzt anpassen');render();}},'Eigene Sätze')),
+    own?null:h('div',{class:'eyebrow'},'Es gilt das Modell unter Vertrieb → Provisionsmodell: Einrichtung '+(std.einrichtung||[]).map(pct).join(' / ')+' · Lizenz '+(std.lizenz||[]).map(pct).join(' / ')+' für '+(std.lizenzMonate||[]).join(' / ')+' Monate.'),
+    h('h3',null,'Anteil an der Einrichtung'),h('div',{class:'grid2'},...[0,1,2].map(i=>num('einrichtung',i,'%'))),
+    h('h3',null,'Anteil an der Lizenz'),h('div',{class:'grid2'},...[0,1,2].map(i=>num('lizenz',i,'%'))),
+    h('h3',null,'Laufzeit der Lizenzprovision'),h('div',{class:'grid2'},...[0,1,2].map(i=>num('lizenzMonate',i,'Monate'))),
+    own?h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async()=>{const tot=(R.einrichtung||[]).reduce((a,b)=>a+(Number(b)||0),0);if(tot>100){toast('Zusammen höchstens 100 % der Einrichtung.');return;}await updProd(p.id,{rates:R});toast('Provisionssätze gespeichert');render();}},'Speichern')):null,
+    h('div',{class:'eyebrow'},'Gilt für Einrichtungen, die ab jetzt gebucht werden. Bereits gebuchte Kunden behalten ihre Sätze. Sonderkonditionen einzelner Partner, Aktivitätsbedingung und Incentive-Aktionen gelten zusätzlich.'))];
+}
+function prodFragen(p){
+  const t=S.tpls[p.id];
+  if(!t)return [h('section',{class:'card'},h('h2',null,'Fragenkatalog · '+p.name),h('div',{class:'eyebrow'},'Für dieses Produkt gibt es noch keinen Fragenkatalog.'),h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async()=>{S.tpls[p.id]={name:p.name,product:p.name,sections:[{title:'Allgemein',questions:[{id:'q'+Date.now().toString(36),text:'Neue Frage',star:true}]}]};await S.db.doc('templates/'+p.id).set(S.tpls[p.id]);render();}},'Fragenkatalog anlegen')))];
+  const out=[h('div',{class:'banner info'},'Änderungen gelten für alle Kunden von „'+p.name+'“. Bereits unterschriebene Akten behalten ihre Prüfsumme; ihr PDF zeigt aber die aktuelle Fassung der Fragen.')];
+  t.sections.forEach((s,si)=>{
+    const card=h('section',{class:'card'},h('div',{class:'row',style:'align-items:flex-end'},h('div',{class:'field',style:'flex:1'},h('label',{for:'ts-'+si},'Abschnitt'),h('input',{type:'text',id:'ts-'+si,value:s.title,oninput:e=>{s.title=e.target.value;saveTpl(p.id);}})),
+      t.sections.length>1&&!s.questions.length?h('button',{type:'button',class:'btn',onclick:()=>{t.sections.splice(si,1);saveTpl(p.id);render();}},'Abschnitt entfernen'):null));
     s.questions.forEach((q,qi)=>{
       card.append(h('div',{class:'tpl-q'},
-        h('input',{type:'text','aria-label':'Frage',id:'tq-'+q.id,value:q.text,oninput:e=>{q.text=e.target.value;saveTpl();}}),
-        h('label',{class:'check',style:'min-height:44px;align-items:center'},h('input',{type:'checkbox',checked:q.star,onchange:e=>{q.star=e.target.checked;saveTpl();}}),'★'),
-        h('button',{type:'button',class:'btn','aria-label':'Frage entfernen',onclick:()=>{s.questions.splice(qi,1);saveTpl();render();}},'Entfernen')));
+        h('input',{type:'text','aria-label':'Frage',id:'tq-'+q.id,value:q.text,oninput:e=>{q.text=e.target.value;saveTpl(p.id);}}),
+        h('label',{class:'check',style:'min-height:44px;align-items:center'},h('input',{type:'checkbox',checked:q.star,onchange:e=>{q.star=e.target.checked;saveTpl(p.id);}}),'★'),
+        h('button',{type:'button',class:'btn','aria-label':'Frage entfernen',onclick:()=>{s.questions.splice(qi,1);saveTpl(p.id);render();}},'Entfernen')));
     });
-    card.append(h('button',{type:'button',class:'btn ghost-dashed',onclick:()=>{s.questions.push({id:'q'+Date.now().toString(36),text:'Neue Frage',star:false});saveTpl();render();}},'+ Frage hinzufügen'));
+    card.append(h('button',{type:'button',class:'btn ghost-dashed',onclick:()=>{s.questions.push({id:'q'+Date.now().toString(36),text:'Neue Frage',star:false});saveTpl(p.id);render();}},'+ Frage hinzufügen'));
     out.push(card);
   });
-  out.push(h('h2',null,'Rechtstexte'),h('div',{class:'banner warn'},'Entwurf: Diese Texte vor dem ersten echten Einsatz von einem Anwalt prüfen lassen. Platzhalter: {{firma}}, {{adresse}}, {{vertreter}}, {{dsb}}, {{speicherung}}, {{datum}}.'));
-  legalDocs().forEach((d,i)=>{
+  out.push(h('div',{class:'row'},h('button',{type:'button',class:'btn ghost-dashed',onclick:()=>{t.sections.push({title:'Neuer Abschnitt',questions:[]});saveTpl(p.id);render();}},'+ Abschnitt')));
+  return out;
+}
+function prodRecht(p){
+  const l=S.legals[p.id];
+  if(!l)return [h('section',{class:'card'},h('h2',null,'Rechtstexte · '+p.name),h('div',{class:'eyebrow'},'Für dieses Produkt gibt es noch keine Rechtstexte.'),S.legals[DEF_PID]?h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async()=>{S.legals[p.id]=JSON.parse(JSON.stringify(S.legals[DEF_PID]));await S.db.doc('legal/'+p.id).set(S.legals[p.id]);render();}},'Rechtstexte von „'+prodName(DEF_PID)+'“ übernehmen')):null)];
+  const out=[h('div',{class:'banner warn'},'Entwurf: Diese Texte vor dem ersten echten Einsatz von einem Anwalt prüfen lassen. Platzhalter: {{firma}}, {{adresse}}, {{vertreter}}, {{dsb}}, {{speicherung}}, {{datum}}.'+(p.id!==DEF_PID&&p.from?' Die Texte wurden kopiert – bitte auf dieses Produkt anpassen.':''))];
+  (l.items||[]).forEach((d,i)=>{
     out.push(h('section',{class:'card'},
       h('div',{class:'field'},h('label',{for:'lt-'+i},'Titel'),h('input',{type:'text',id:'lt-'+i,value:d.title,oninput:e=>{d.title=e.target.value;}})),
       h('div',{class:'field'},h('label',{for:'lb-'+i},'Text'),h('textarea',{id:'lb-'+i,style:'min-height:260px',value:d.body,oninput:e=>{d.body=e.target.value;}})),
-      h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async()=>{await S.db.doc('legal/'+LEGAL_ID).set(S.legal);toast('Rechtstext gespeichert');}},'Speichern'))));
+      h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async()=>{await S.db.doc('legal/'+p.id).set(l);toast('Rechtstext gespeichert');}},'Speichern'))));
   });
   return out;
 }
@@ -898,10 +1033,11 @@ async function runResearch(c){
   const url=c.webseite;if(!url)return;
   S.research[c.id]={busy:true,step:'Webseite wird gelesen …'};render._force=true;render();
   try{
-    const qs=allQs().map(q=>({id:q.id,text:q.text}));const st=cfg().staffeln.map(x=>({id:x.id,label:x.label}));
-    const f=await callFn('research',{step:'fetch',url,customerId:c.id,questions:qs,staffeln:st});
+    const qs=inProd(pidOf(c),()=>allQs()).map(q=>({id:q.id,text:q.text}));const st=staffelnOf(pidOf(c)).map(x=>({id:x.id,label:x.label}));
+    const pr=prodById(pidOf(c))||{};
+    const f=await callFn('research',{step:'fetch',url,customerId:c.id,questions:qs,staffeln:st,produkt:{name:prodName(pidOf(c)),beschreibung:pr.beschreibung||(pidOf(c)===DEF_PID?DEF_BESCHR:''),telefon:isPhone(pidOf(c))}});
     S.research[c.id]={busy:true,step:'KI wertet aus …'};render._force=true;render();
-    const base={step:'analyze',url:f.url,customerId:c.id,pages:f.pages,questions:f.questions,staffeln:f.staffeln,rid:f.rid,exp:f.exp,sig:f.sig};
+    const base={step:'analyze',url:f.url,customerId:c.id,pages:f.pages,questions:f.questions,staffeln:f.staffeln,produkt:f.produkt,rid:f.rid,exp:f.exp,sig:f.sig};
     // drei kurze Auswertungen parallel, damit keine das Zeitlimit reißt
     const parts=await Promise.allSettled([callFn('research',Object.assign({part:'a'},base)),callFn('research',Object.assign({part:'b'},base)),callFn('research',Object.assign({part:'c'},base))]);
     const okParts=parts.filter(p=>p.status==='fulfilled');
@@ -936,7 +1072,7 @@ function researchCard(c){
   const diffs=['firma','adresse','telefon','email','ansprechpartner','branche'].filter(k=>r[k]&&String(c[k]||'').trim()&&String(c[k]).trim()!==r[k]);
   const li=arr=>h('ul',{style:'margin:4px 0 0;padding-left:20px'},...arr.map(x=>h('li',null,x)));
   const row=(l,v)=>v&&(!Array.isArray(v)||v.length)?h('div',null,h('div',{class:'label'},l),Array.isArray(v)?li(v):h('div',{style:'overflow-wrap:anywhere'},v)):null;
-  const stf=r.staffel&&cfg().staffeln.find(x=>x.id===r.staffel);const nAnt=Object.keys(r.antworten||{}).filter(id=>!realAnswer((c.answers||{})[id])).length;
+  const stf=r.staffel&&staffelnOf(pidOf(c)).find(x=>x.id===r.staffel);const nAnt=Object.keys(r.antworten||{}).filter(id=>!realAnswer((c.answers||{})[id])).length;
   const mailOpen=S.broMail===c.id;
   return h('section',{class:'card','aria-label':'Vorab-Recherche'},
     h('div',{class:'row'},h('h2',null,'Vorab recherchiert'),h('div',{class:'spacer'}),h('span',{class:'eyebrow'},fmtDate(r.at)+' · '+webHost(r.url))),
@@ -944,16 +1080,16 @@ function researchCard(c){
     diffs.length?h('div',{class:'dlist'},...diffs.map(k=>h('div',{class:'member'},h('div',{class:'who'},h('strong',null,STAMM_LABEL[k]+': '),r[k],h('div',{class:'eyebrow'},'bisher: '+c[k])),h('button',{type:'button',class:'btn',style:'min-height:38px;font-size:14px',onclick:()=>{const p={};p[k]=r[k];saveCust(c.id,p,0);render._force=true;render();}},'Übernehmen')))):null,
     row('Kurzprofil',r.kurzprofil),
     h('div',{class:'cols2'},row('Leistungen',r.leistungen),h('div',{style:'display:flex;flex-direction:column;gap:10px'},row('Zielkunden',r.zielkunden),row('Erreichbarkeit / Öffnungszeiten',r.oeffnungszeiten),row('Standorte',r.standorte),row('Größe',r.mitarbeiter))),
-    row('Ansatzpunkte für den KI-Telefon-Agenten',r.ansatzpunkte),
+    row('Ansatzpunkte für '+prodName(pidOf(c)),r.ansatzpunkte),
     h('div',{class:'row',style:'gap:10px'},
-      stf?h('button',{type:'button',class:'btn',onclick:()=>{const curS=(c.offer||{}).staffel;if(curS&&curS!==stf.id){const old=cfg().staffeln.find(x=>x.id===curS);if(!confirm('Im Angebot ist bereits „'+(old?old.label:curS)+'“ gewählt. Durch „'+stf.label+'“ ersetzen?'))return;}const items=((c.offer||{}).items||[]).filter(i=>i.kind!=='einrichtung'&&i.kind!=='lizenz');saveCust(c.id,{offer:{items:staffelItems(stf).concat(items),staffel:stf.id}},0);toast('Staffel „'+stf.label+'“ ins Angebot übernommen');render._force=true;render();}},'Staffel vorschlagen: '+stf.label):null,
+      stf?h('button',{type:'button',class:'btn',onclick:()=>{const curS=(c.offer||{}).staffel;if(curS&&curS!==stf.id){const old=staffelnOf(pidOf(c)).find(x=>x.id===curS);if(!confirm('Im Angebot ist bereits „'+(old?old.label:curS)+'“ gewählt. Durch „'+stf.label+'“ ersetzen?'))return;}const items=((c.offer||{}).items||[]).filter(i=>i.kind!=='einrichtung'&&i.kind!=='lizenz');saveCust(c.id,{offer:{items:staffelItems(stf,pidOf(c)).concat(items),staffel:stf.id}},0);toast('Staffel „'+stf.label+'“ ins Angebot übernommen');render._force=true;render();}},'Staffel vorschlagen: '+stf.label):null,
       nAnt?h('button',{type:'button',class:'btn',onclick:()=>{S.view='fragen';S.section=0;render();window.scrollTo(0,0);}},nAnt+(nAnt===1?' Vorschlag':' Vorschläge')+' im Fragenkatalog'):null,
       h('button',{type:'button',class:'btn primary',onclick:async()=>{try{const b=await brochurePdf(c);await S.dl.save({filename:brochureName(c),data:b});}catch(e){toast('PDF fehlgeschlagen: '+e.message);}}},'Vorab-Broschüre (PDF)'),
       h('button',{type:'button',class:'btn',onclick:()=>{S.broMail=mailOpen?null:c.id;render._force=true;render();}},'Broschüre per E-Mail')),
     mailOpen?broMailForm(c):broEditor(c,false),
     r.quellen&&r.quellen.length?h('div',{class:'eyebrow',style:'overflow-wrap:anywhere;white-space:normal'},'Quellen: '+[...new Set(r.quellen.map(u=>{try{const x=new URL(u);return webHost(u)+(x.pathname.length>1?x.pathname.replace(/\/$/,''):'');}catch(e){return '';}}).filter(Boolean))].join(' · ')):null);
 }
-function brochureName(c){return ('ONLION_KI-Telefon-Agent_fuer_'+(c.firma||'Kunde')).replace(/[^\wäöüÄÖÜß.-]+/g,'_')+'.pdf';}
+function brochureName(c){return ('ONLION_'+prodName(pidOf(c))+'_fuer_'+(c.firma||'Kunde')).replace(/[^\wäöüÄÖÜß.-]+/g,'_')+'.pdf';}
 function broMailForm(c){
   const st=h('div',{class:'banner warn',hidden:true});
   const ap=String(c.ansprechpartner||'').trim();
@@ -967,14 +1103,14 @@ function broMailForm(c){
       saveCust(c.id,{crm:{log:[entry].concat(crmOf(cur()||c).log||[])}},0);S.broMail=null;toast('Broschüre gesendet');render._force=true;render();}
     catch(err){st.textContent=err.message;st.hidden=false;btn.disabled=false;btn.textContent='Senden';}
   }},h('div',{class:'banner info'},'Werbung per E-Mail ist ohne Einwilligung auch an Firmen nicht erlaubt (§ 7 UWG). Nur senden, wenn der Empfänger zugestimmt hat – z. B. im Telefonat. Sonst die Broschüre mitbringen oder per Post senden.'),
-    h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'bm-to'},'An'),h('input',{type:'email',id:'bm-to',value:c.email||''})),h('div',{class:'field'},h('label',{for:'bm-subj'},'Betreff'),h('input',{type:'text',id:'bm-subj',value:'Ihr KI-Telefon-Agent – Vorab-Information von ONLION'}))),
-    h('div',{class:'field'},h('label',{for:'bm-msg'},'Nachricht'),h('textarea',{id:'bm-msg',style:'min-height:110px',value:(ap?'Guten Tag '+ap+',':'Guten Tag,')+'\n\nwie besprochen erhalten Sie anbei eine erste Vorab-Information, wie ein KI-Telefon-Agent für '+(c.firma||'Ihr Unternehmen')+' aussehen könnte.\n\nViele Grüße\nONLION'})),
+    h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'bm-to'},'An'),h('input',{type:'email',id:'bm-to',value:c.email||''})),h('div',{class:'field'},h('label',{for:'bm-subj'},'Betreff'),h('input',{type:'text',id:'bm-subj',value:'Ihr '+prodName(pidOf(c))+' – Vorab-Information von ONLION'}))),
+    h('div',{class:'field'},h('label',{for:'bm-msg'},'Nachricht'),h('textarea',{id:'bm-msg',style:'min-height:110px',value:(ap?'Guten Tag '+ap+',':'Guten Tag,')+'\n\nwie besprochen erhalten Sie anbei eine erste Vorab-Information, wie '+prodName(pidOf(c))+' für '+(c.firma||'Ihr Unternehmen')+' aussehen könnte.\n\nViele Grüße\nONLION'})),
     broEditor(c,true),
     h('label',{class:'check'},h('input',{type:'checkbox',id:'bm-ok'}),'Der Empfänger hat der Zusendung zugestimmt.'),
     st,h('div',{class:'row'},h('button',{type:'submit',class:'btn primary'},'Senden'),h('button',{type:'button',class:'btn',onclick:()=>{S.broMail=null;render();}},'Abbrechen')));
 }
 async function brochurePdf(c){
-  const r=c.recherche||{};const br=r.broschuere||{};const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'a4'});
+  const r=c.recherche||{};const br=r.broschuere||{};const tel=isPhone(pidOf(c));const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'a4'});
   const W=210,M=20,CW=W-2*M;let y=0;const INK=[28,28,26],MUT=[112,112,104],LIME=[200,255,0],ACC=[74,102,0],SOFT=[245,245,241];
   const col=a=>doc.setTextColor(a[0],a[1],a[2]);const font=(sz,st)=>{doc.setFont('helvetica',st||'normal');doc.setFontSize(sz);};
   const wrap=(t,sz,st,w)=>{font(sz,st);return doc.splitTextToSize(clean(t),w||CW);};
@@ -987,19 +1123,19 @@ async function brochurePdf(c){
   doc.setFillColor(...SOFT);doc.rect(0,0,W,86,'F');
   if(logo)doc.addImage(logo,'PNG',M,18,40,8.3,'logo','FAST');
   font(10,'bold');col(ACC);doc.text('VORAB-INFORMATION',M,42);
-  let tsz=24,tl;for(;;){font(tsz,'bold');tl=doc.splitTextToSize(clean('Ihr KI-Telefon-Agent für '+(c.firma||'Ihr Unternehmen')),CW);if(tl.length<=2||tsz<=15)break;tsz-=2;}
+  let tsz=24,tl;for(;;){font(tsz,'bold');tl=doc.splitTextToSize(clean('Ihr '+prodName(pidOf(c))+' für '+(c.firma||'Ihr Unternehmen')),CW);if(tl.length<=2||tsz<=15)break;tsz-=2;}
   if(tl.length>3){tl=tl.slice(0,3);tl[2]=tl[2].replace(/\s*\S*$/,'')+' ...';}
   col(INK);doc.text(tl,M,53);const lh=tsz*0.4;
-  font(11);col(MUT);doc.text(clean('Erreichbar rund um die Uhr – ohne zusätzliches Personal.'),M,53+(tl.length-1)*lh+8);
+  font(11);col(MUT);doc.text(clean(tel?'Erreichbar rund um die Uhr – ohne zusätzliches Personal.':String((prodById(pidOf(c))||{}).beschreibung||'Vorab-Information von ONLION').slice(0,110)),M,53+(tl.length-1)*lh+8);
   doc.setFillColor(...LIME);doc.rect(0,86,W,2.2,'F');y=102;
   if(r.kurzprofil){h2('Was wir über '+(c.firma||'Sie')+' wissen');para(r.kurzprofil,10.5,'normal',INK,4);}
-  if(br.begruessung){h2('So meldet sich Ihr Agent');const l=wrap('„'+br.begruessung+'“',11.5,'italic',CW-14);need(l.length*5.4+12);doc.setFillColor(...SOFT);doc.roundedRect(M,y-5,CW,l.length*5.4+8,2.5,2.5,'F');doc.setFillColor(...LIME);doc.rect(M,y-5,1.6,l.length*5.4+8,'F');font(11.5,'italic');col(INK);doc.text(l,M+7,y+0.5);y+=l.length*5.4+9;}
-  if((br.anliegen||[]).length){h2('Typische Anliegen, die er übernimmt');bullets(br.anliegen);}
-  if((br.weiterleitungen||[]).length){h2('Wann er an Ihr Team weiterleitet');bullets(br.weiterleitungen);}
+  if(br.begruessung){h2(tel?'So meldet sich Ihr Agent':'So könnte es bei Ihnen aussehen');const l=wrap('„'+br.begruessung+'“',11.5,'italic',CW-14);need(l.length*5.4+12);doc.setFillColor(...SOFT);doc.roundedRect(M,y-5,CW,l.length*5.4+8,2.5,2.5,'F');doc.setFillColor(...LIME);doc.rect(M,y-5,1.6,l.length*5.4+8,'F');font(11.5,'italic');col(INK);doc.text(l,M+7,y+0.5);y+=l.length*5.4+9;}
+  if((br.anliegen||[]).length){h2(tel?'Typische Anliegen, die er übernimmt':'Typische Aufgaben, die es übernimmt');bullets(br.anliegen);}
+  if((br.weiterleitungen||[]).length){h2(tel?'Wann er an Ihr Team weiterleitet':'Wann Ihr Team übernimmt');bullets(br.weiterleitungen);}
   if((br.nutzen||[]).length){h2('Ihr Nutzen');bullets(br.nutzen);}
   h2('So läuft die Einführung');
-  bullets(['Gespräch: Ziele, Anliegen und Abläufe gemeinsam festlegen','Einrichtung: Begrüßung, Wissen und Weiterleitungen werden eingerichtet','Test: Sie rufen selbst an und geben Feedback','Start: Rufumleitung aktivieren – Ihr Agent ist erreichbar']);
-  const sid=(c.offer||{}).staffel||r.staffel;const stf=(sid&&cfg().staffeln.find(x=>x.id===sid))||null;
+  bullets(tel?['Gespräch: Ziele, Anliegen und Abläufe gemeinsam festlegen','Einrichtung: Begrüßung, Wissen und Weiterleitungen werden eingerichtet','Test: Sie rufen selbst an und geben Feedback','Start: Rufumleitung aktivieren – Ihr Agent ist erreichbar']:['Gespräch: Ziele und Abläufe gemeinsam festlegen','Einrichtung: '+prodName(pidOf(c))+' wird auf Ihr Unternehmen abgestimmt','Test: Sie probieren es aus und geben Feedback','Start: Einsatz im Alltag, wir begleiten den Anfang']);
+  const sid=(c.offer||{}).staffel||r.staffel;const stf=(sid&&staffelnOf(pidOf(c)).find(x=>x.id===sid))||null;
   if(stf&&!stf.individuell){need(44);h2('Investition');doc.setFillColor(...SOFT);doc.roundedRect(M,y-5,CW,22,2.5,2.5,'F');font(10);col(MUT);doc.text(clean('Paket '+stf.label),M+6,y+1.5);font(13,'bold');col(INK);doc.text(clean(eur(stf.einrichtung)+' Einrichtung  +  '+eur(stf.lizenz)+' pro Monat'),M+6,y+9.5);font(8.5);col(MUT);doc.text(clean('zzgl. USt. Unverbindliche Vorab-Information, das verbindliche Angebot folgt nach dem Gespräch.'),M+6,y+14.5);y+=26;}
   const ab=cfg().absender||{};
   const pages=doc.getNumberOfPages();for(let i=1;i<=pages;i++){doc.setPage(i);font(7.5);col(MUT);doc.text(clean(['ONLION',ab.adresse].filter(Boolean).join(' · ')),M,288);doc.text('Seite '+i+' von '+pages,W-M,288,{align:'right'});}
@@ -1111,17 +1247,17 @@ const eur0=n=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',max
 function goalCard(){
   const k=cfg().kosten;const year=todayStr().slice(0,4);const mon=new Date().getMonth()+1;const curM=todayStr().slice(0,7);
   const ist=r2(S.zahl.filter(z=>!z.storniert&&String(z.datum).slice(0,4)===year).reduce((s,z)=>s+z.netto,0));
-  const act=activeCustomers();const n=act.length;const lizBase=r2(act.reduce((s,c)=>s+contractLicense(c),0));
+  const act=activeCustomers();const n=act.length;const nP=act.filter(c=>isPhone(pidOf(c))).length;const lizBase=r2(act.reduce((s,c)=>s+contractLicense(c),0));
   // Prognose: Lizenzen der Folgemonate plus offene Lizenz des laufenden Monats
   const openNow=r2(act.filter(c=>{const e0=setupOf(c.id);return String(e0.lizenzStart||'')<=curM&&!S.zahl.some(z=>z.customerId===c.id&&z.art==='lizenz'&&!z.storniert&&z.monat===curM);}).reduce((s,c)=>s+contractLicense(c),0));
   const prog=r2(ist+openNow+lizBase*(12-mon));const ziel=Number(k.umsatzziel)||0;
-  const db=r2(act.reduce((s,c)=>s+customerDB(c),0));const fixOhne=Number(k.fixkosten)||0;const fix=r2(fixOhne+platformTotal(n));
+  const db=r2(act.reduce((s,c)=>s+customerDB(c),0));const fixOhne=Number(k.fixkosten)||0;const fix=r2(fixOhne+platformTotal(nP));
   const deck=fix>0?Math.round(db/fix*100):100;
   // Schätzwert je weiterem Kunden: Durchschnitt der Kunden, sonst Staffel 1 nach Verkäufer-Provision und Minuten
   const s1=cfg().staffeln[0]||{lizenz:450};const r0=Number(((versionAt(todayStr()).rates||{}).lizenz||[])[0])||0;
   const avgDB=n?db/n:r2((s1.lizenz||0)*(1-r0/100)-minuteCost());
   let fehlen=0,undeckbar=false;
-  if(db<fix){if(avgDB<=0)undeckbar=true;else{let kk=0;while(db+kk*avgDB<fixOhne+platformTotal(n+kk)&&kk<10000)kk++;fehlen=kk;}}
+  if(db<fix){if(avgDB<=0)undeckbar=true;else{let kk=0;while(db+kk*avgDB<fixOhne+platformTotal(nP+kk)&&kk<10000)kk++;fehlen=kk;}}
   const pctZiel=ziel?Math.min(100,Math.round(ist/ziel*100)):0;
   return h('section',{class:'card'},h('div',{class:'row'},h('h2',null,'Ziel & Kostendeckung'),h('div',{class:'spacer'}),h('span',{class:'eyebrow'},'nur für ONLION sichtbar')),
     h('div',{class:'kpis'},
@@ -1129,13 +1265,14 @@ function goalCard(){
       kpiTile('Prognose Jahresende',eur0(prog),'bisher + Lizenzen bis Dezember'),
       kpiTile('Lizenzen pro Monat',eur0(lizBase),n===1?'1 aktiver Kunde':n+' aktive Kunden'),
       kpiTile('Deckungsbeitrag',eur0(db),'pro Monat, nach Provisionen und Minuten'),
-      kpiTile('Fixkosten',eur0(fix),'pro Monat, inkl. Plattform '+eur0(platformTotal(n))),
+      kpiTile('Fixkosten',eur0(fix),'pro Monat, inkl. Plattform '+eur0(platformTotal(nP))),
       kpiTile('Kostendeckung',deck+' %',undeckbar?'mit diesen Preisen nicht deckbar':fehlen?'noch ca. '+fehlen+(fehlen===1?' Kunde':' Kunden'):'gedeckt')),
     ziel?h('div',{class:'pbar',role:'img','aria-label':'Umsatzziel '+pctZiel+' %'},h('div',{style:'width:'+pctZiel+'%'})):null);
 }
 function offerNet(c){return offerTotals((c.offer&&c.offer.items)||[]).net;}
 function viewDashboard(){
-  const cs=S.customers,n=cs.length,today=todayStr(),month=today.slice(0,7);
+  const multi=prodNav().length>1;if(S.dashProd&&!prodById(S.dashProd))S.dashProd='';
+  const cs=S.dashProd?custOf(S.dashProd):S.customers,n=cs.length,today=todayStr(),month=today.slice(0,7);
   const in7=(()=>{const d=new Date();d.setDate(d.getDate()+7);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
   const locMonth=iso=>{const d=new Date(iso);return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');};
   const by={};for(const st of CRM)by[st.id]=[];for(const c of cs)(by[stat(c)]||by.neu).push(c);
@@ -1179,14 +1316,15 @@ function viewDashboard(){
   for(const c of list){
     const dl=new Set(crmOf(c).logDel||[]);const last=(crmOf(c).log||[]).find(e=>!dl.has(e.id||(e.at+'|'+e.by)));
     tb.append(h('tr',{class:'clk',tabindex:'0',onclick:()=>open(c),onkeydown:e=>{if(e.key==='Enter')open(c);}},
-      h('td',null,h('strong',null,c.firma||'Ohne Namen')),h('td',null,statEl(stat(c))),
+      h('td',null,h('strong',null,c.firma||'Ohne Namen'),multi&&!S.dashProd?h('div',{class:'eyebrow'},prodName(pidOf(c))):null),h('td',null,statEl(stat(c))),
       h('td',{class:'hide-m'},crmOf(c).termin?fmtDay(crmOf(c).termin):'–'),
       h('td',{class:'hide-m'},last?fmtDate(last.at)+' · '+last.type:'–'),
       h('td',{class:'num'+(offerNet(c)?'':' hide-m')},offerNet(c)?eur(offerNet(c)):'–')));
   }
   const table=list.length?h('table',{class:'ctable'},h('thead',null,h('tr',null,h('th',null,'Kunde'),h('th',null,'Status'),h('th',null,'Termin'),h('th',null,'Letzter Kontakt'),h('th',{class:'num'},'Angebot netto'))),tb):h('div',{class:'eyebrow'},f?'Keine Kunden mit Status „'+statT(f)+'“.':'Noch keine Kunden angelegt.');
   return [
-    h('div',null,h('div',{class:'eyebrow'},'Überblick'),h('h1',null,'Dashboard')),
+    h('div',null,h('div',{class:'eyebrow'},'Überblick'+(S.dashProd?' · '+prodName(S.dashProd):'')),h('h1',null,'Dashboard')),
+    multi?h('div',{class:'chips',role:'group','aria-label':'Produkt'},...[{id:'',name:'Alle Produkte'}].concat(prodNav()).map(p=>h('button',{type:'button',class:'chip'+((S.dashProd||'')===p.id?' on':''),'aria-pressed':(S.dashProd||'')===p.id?'true':'false',onclick:()=>{S.dashProd=p.id;S.dashFilter='';render();}},p.name))):null,
     isAdmin()?goalCard():null,
     kpis,
     h('section',{class:'card'},h('h2',null,'Status der Kunden'),pipe),
@@ -1234,7 +1372,7 @@ function platformTotal(n){const k=cfg().kosten;return n<=Number(k.plattformKlein
 function minuteCost(){const k=cfg().kosten;return r2(Number(k.minutenpreis||0)*Number(k.minutenSchnitt||0));}
 function setupCost(){const k=cfg().kosten;return r2(Number(k.einrichtungStunden||0)*Number(k.stundensatz||0));}
 function licenseProvision(c,netto){const e0=setupOf(c.id);const m=e0&&e0.lizenzStart&&e0.lizenzStart>todayStr().slice(0,7)?e0.lizenzStart:todayStr().slice(0,7);const z={id:'x',customerId:c.id,firma:c.firma,partner:String(c.partner||'').toLowerCase(),art:'lizenz',netto,datum:todayStr(),monat:m};return r2(computeRows(z).reduce((s,r)=>s+r.betrag,0));}
-function customerDB(c){const lic=contractLicense(c);return r2(lic-licenseProvision(c,lic)-minuteCost());}
+function customerDB(c){const lic=contractLicense(c);return r2(lic-licenseProvision(c,lic)-(isPhone(pidOf(c))?minuteCost():0));}
 function contractLicense(c){const e0=setupOf(c.id);return e0&&e0.lizenzVertrag!=null?e0.lizenzVertrag:custOffer(c).lizenz;}
 function liveProv(){return S.prov.filter(p=>p.status!=='storniert');}
 /* Provisionszeilen für eine Zahlung berechnen (nur ONLION). extra = schon berechnete Zeilen im selben Durchgang */
@@ -1244,10 +1382,11 @@ function computeRows(z,batch){
   const out=[];const seller=String(z.partner||'').toLowerCase();if(!seller||z.netto<=0)return out;
   const chain=[seller];let cur=seller;for(let i=0;i<2;i++){const sp=sponsorOf(cur);if(!sp||chain.includes(sp))break;chain.push(sp);cur=sp;}
   // Konditionen: Einrichtung nach Modell am Zahlungstag; Lizenz nach den Konditionen, die bei der Einrichtung galten
-  let v=versionAt(z.datum),sonder=(tm(seller)||{}).sonder||null,idx=1;
-  if(z.art==='lizenz'){const e0=setupOf(z.customerId,batch);if(e0){v=versionById(e0.version)||versionAt(e0.datum);sonder=e0.sonder||null;idx=monthsBetween(e0.lizenzStart||String(e0.datum).slice(0,7),z.monat)+1;}}
+  let v=versionAt(z.datum),sonder=(tm(seller)||{}).sonder||null,idx=1,pr=z.prodRates||null;
+  if(z.art==='lizenz'){const e0=setupOf(z.customerId,batch);if(e0){v=versionById(e0.version)||versionAt(e0.datum);sonder=e0.sonder||null;pr=e0.prodRates||null;idx=monthsBetween(e0.lizenzStart||String(e0.datum).slice(0,7),z.monat)+1;}}
   else if(z.sonder!==undefined)sonder=z.sonder;
-  const R=v.rates||{};const zahlPool=S.zahl.concat(batch||[]);
+  // eigene Sätze eines Produkts (bei der Einrichtung festgehalten) gehen dem allgemeinen Modell vor
+  const R=pr||v.rates||{};const zahlPool=S.zahl.concat(batch||[]);
   const akts=z.art==='einrichtung'?aktionenAt(z.datum):[];
   const firstSale=!zahlPool.some(x=>x.id!==z.id&&x.partner===seller&&x.art==='einrichtung'&&!x.storniert&&x.netto>0)&&!liveProv().some(r=>r.von===seller&&r.ebene===1&&(r.starthilfe||(r.aktion&&(cfg().aktionen.find(a=>a.id===r.aktion)||{}).typ==='starthilfe')));
   const stp=tm(seller)||{};const joined=String(stp.vertrag_am||stp.added_at||'').slice(0,10);
@@ -1285,7 +1424,8 @@ async function bookPayments(list){
   const zs=[],rows=[];
   for(const it of list){
     const c=it.customer;const z={id:uid(),customerId:c.id,firma:c.firma||'',partner:String(c.partner||'').toLowerCase(),art:it.art,netto:r2(it.netto),datum:it.datum,monat:it.art==='lizenz'?it.monat:'',storniert:false,by:(S.me&&S.me.email)||'',at:new Date().toISOString()};
-    if(it.art==='einrichtung'){z.staffel=((c.offer||{}).staffel)||'';z.version=versionAt(z.datum).id;z.sonder=(tm(z.partner)||{}).sonder||null;z.lizenzVertrag=r2(it.lizenzVertrag!=null?it.lizenzVertrag:custOffer(c).lizenz);z.lizenzStart=it.lizenzStart||String(z.datum).slice(0,7);}
+    z.produkt=pidOf(c);
+    if(it.art==='einrichtung'){z.staffel=((c.offer||{}).staffel)||'';z.version=versionAt(z.datum).id;const prr=prodRates(pidOf(c));if(prr)z.prodRates=JSON.parse(JSON.stringify(prr));z.sonder=(tm(z.partner)||{}).sonder||null;z.lizenzVertrag=r2(it.lizenzVertrag!=null?it.lizenzVertrag:custOffer(c).lizenz);z.lizenzStart=it.lizenzStart||String(z.datum).slice(0,7);}
     const rs=computeRows(z,zs);zs.push(z);rows.push(...rs);
   }
   await S.db.bulk('zahlungen',zs);
@@ -1331,7 +1471,7 @@ async function markPaid(g){
 const AKT_TYP={prozent:'Prozent-Aufschlag auf die Einrichtung',gross:'Bonus für große Kunden',starthilfe:'Starthilfe für Werber'};
 function aktOn(a,d){return !!(a&&a.aktiv&&(!a.von||String(d)>=a.von)&&(!a.bis||String(d)<=a.bis));}
 function aktionenAt(d){return cfg().aktionen.filter(a=>aktOn(a,d));}
-function aktText(a){return a.typ==='prozent'?'+'+pct(a.prozent)+' auf die Einrichtung für den Verkäufer':a.typ==='gross'?eur(a.betrag)+' Bonus je bezahlter Einrichtung bei: '+(a.staffeln||[]).map(id=>(cfg().staffeln.find(x=>x.id===id)||{}).label||id).join(', '):'Werber erhält '+pct(a.prozent)+' der Einrichtung beim ersten bezahlten Kunden seines neuen Partners (statt Ebene-1-Satz; Ebene 2 entfällt bei diesem Abschluss)';}
+function aktText(a){return a.typ==='prozent'?'+'+pct(a.prozent)+' auf die Einrichtung für den Verkäufer':a.typ==='gross'?eur(a.betrag)+' Bonus je bezahlter Einrichtung bei: '+(a.staffeln||[]).map(id=>{const x=staffelById(id);return x?(prodAll().length>1?x.pname+': ':'')+x.label:id;}).join(', '):'Werber erhält '+pct(a.prozent)+' der Einrichtung beim ersten bezahlten Kunden seines neuen Partners (statt Ebene-1-Satz; Ebene 2 entfällt bei diesem Abschluss)';}
 function provText(r){
   if(r.art==='bonus')return (r.storno?'Storno: ':'')+'Aktion „'+(r.aktionName||'Bonus')+'“ · '+(r.kunde||'Kunde');
   const art=r.art==='einrichtung'?'Einrichtung':'Lizenz '+(r.monat?fmtMonth(r.monat):'')+(r.lizenzMonat?' (Monat '+r.lizenzMonat+')':'');
@@ -1355,7 +1495,7 @@ async function creditPdf(g){
   for(const [k,v] of [['Gutschrift-Nr.',g.nr],['Datum',fmtDay(g.datum).replace(/^\w+\.,\s*/,'')],['Abrechnungszeitraum',fmtMonth(g.monat)],['Steuer-Nr./USt-ID Empfänger',e.steuer||'–']]){doc.text(clean(k),W-M-62,ry);col(INK);doc.text(clean(String(v)),W-M,ry,{align:'right'});col(MUT);ry+=5;}
   y=Math.max(y,ry)+8;
   font(16,'bold');col(INK);doc.text('Gutschrift',M,y);y+=6;
-  font(9);col(MUT);doc.text(clean('Provisionsabrechnung für vermittelte Aufträge (KI-Telefon-Agent)'),M,y);y+=9;
+  font(9);col(MUT);doc.text(clean('Provisionsabrechnung für vermittelte Aufträge'),M,y);y+=9;
   const cols=[M,M+22,M+110,M+136,W-M];
   const th=()=>{font(8,'bold');col(MUT);doc.text('Datum',cols[0],y);doc.text('Position',cols[1],y);doc.text('Basis netto',cols[3]-2,y,{align:'right'});doc.text('Satz',cols[3]+12,y,{align:'right'});doc.text('Betrag',cols[4],y,{align:'right'});y+=2;doc.setDrawColor(...LINE);doc.line(M,y,W-M,y);y+=5;};
   th();
@@ -1425,9 +1565,9 @@ function payCard(c){
 /* Angebot: Preisstaffel */
 function staffelChips(c,items,onPick){
   const cur=(c.offer&&c.offer.staffel)||'';
-  return h('div',{class:'field'},h('label',null,'Preisstaffel nach Firmengröße'),h('div',{class:'chips'},...cfg().staffeln.map(s=>h('button',{type:'button',class:'chip'+(cur===s.id?' on':''),onclick:()=>onPick(s)},s.label+(s.individuell?'':' · '+eur0(s.einrichtung)+' + '+eur0(s.lizenz)+'/Monat')))));
+  return h('div',{class:'field'},h('label',null,'Preisstaffel nach Firmengröße'),h('div',{class:'chips'},...staffelnOf(pidOf(c)).map(s=>h('button',{type:'button',class:'chip'+(cur===s.id?' on':''),onclick:()=>onPick(s)},s.label+(s.individuell?'':' · '+eur0(s.einrichtung)+' + '+eur0(s.lizenz)+'/Monat')))));
 }
-function staffelItems(s){return [{name:'Einrichtung KI-Telefon-Agent ('+s.label+')',qty:1,unit:'Pauschal',price:s.einrichtung||0,kind:'einrichtung'},{name:'Lizenz KI-Telefon-Agent',qty:1,unit:'Monat',price:s.lizenz||0,kind:'lizenz'}];}
+function staffelItems(s,pid){const n=prodName(pid);return [{name:'Einrichtung '+n+' ('+s.label+')',qty:1,unit:'Pauschal',price:s.einrichtung||0,kind:'einrichtung'},{name:'Lizenz '+n,qty:1,unit:'Monat',price:s.lizenz||0,kind:'lizenz'}];}
 
 /* Vertrieb (ONLION) bzw. Provisionen (Partner) */
 function provKpis(rows){
@@ -1595,11 +1735,8 @@ function vtModell(){
     :h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:()=>{clearTimeout(t);saveDraft();S.confirm='release';render();}},'Freigeben …'),c.draft?h('button',{type:'button',class:'btn',onclick:async()=>{await saveCfg({draft:null});toast('Entwurf verworfen');render();}},'Entwurf verwerfen'):null)));
   // Versionen
   out.push(h('section',{class:'card'},h('h2',null,'Versionen'),h('div',{class:'dlist'},...c.versions.slice().sort((a,b)=>String(b.from).localeCompare(String(a.from))).map(x=>{const R=x.rates||{};return h('div',{class:'member'},h('div',{class:'who'},h('strong',null,'ab '+fmtDay(x.from).replace(/^\w+\.,\s*/,'')),h('div',{class:'eyebrow'},'Einrichtung '+(R.einrichtung||[]).map(pct).join(' / ')+' · Lizenz '+(R.lizenz||[]).map(pct).join(' / ')+' für '+(R.lizenzMonate||[]).join(' / ')+' Monate'+(x.releasedAt?' · freigegeben '+fmtDate(x.releasedAt):' · Startmodell'))));}))));
-  // Staffeln
-  const st=JSON.parse(JSON.stringify(c.staffeln));
-  const rows=h('div',{class:'offer-rows'});
-  st.forEach((s,i)=>rows.append(h('div',{class:'grid2'},h('div',{class:'field'},h('label',{for:'sf-l'+i},'Staffel'),h('input',{type:'text',id:'sf-l'+i,value:s.label,oninput:e=>s.label=e.target.value})),s.individuell?h('div',{class:'eyebrow',style:'align-self:center'},'Preis individuell im Angebot'):h('div',{class:'field'},h('label',{for:'sf-e'+i},'Einrichtung (€)'),h('input',{type:'number',id:'sf-e'+i,min:'0',step:'50',value:String(s.einrichtung),oninput:e=>s.einrichtung=Math.max(0,parseFloat(e.target.value)||0)})),s.individuell?null:h('div',{class:'field'},h('label',{for:'sf-m'+i},'Lizenz pro Monat (€)'),h('input',{type:'number',id:'sf-m'+i,min:'0',step:'10',value:String(s.lizenz),oninput:e=>s.lizenz=Math.max(0,parseFloat(e.target.value)||0)})))));
-  out.push(h('section',{class:'card'},h('h2',null,'Preisstaffeln'),rows,h('div',{class:'row'},h('button',{type:'button',class:'btn primary',onclick:async()=>{await saveCfg({staffeln:st});toast('Preisstaffeln gespeichert');render();}},'Speichern')),h('div',{class:'eyebrow'},'Neue Preise gelten für neu gewählte Staffeln im Angebot. Bestehende Angebote bleiben unverändert.')));
+  // Preise liegen je Produkt unter Einstellungen → Produkte & Vorlagen
+  out.push(h('section',{class:'card'},h('h2',null,'Preisstaffeln'),h('p',{class:'eyebrow',style:'margin:0'},'Die Preise pflegst du je Produkt unter Einstellungen → Produkte & Vorlagen. Dort kannst du für ein Produkt auch eigene Provisionssätze festlegen; sonst gilt dieses Modell.'),h('div',{class:'row'},h('button',{type:'button',class:'btn',onclick:()=>{S.view='produkte';S.prodEdit=S.prodEdit||DEF_PID;S.prodTab='preise';render();window.scrollTo(0,0);}},'Zu den Preisen'))));
   // Incentive-Aktionen
   {
     const list=c.aktionen.slice();const R0=(versionAt(todayStr()).rates||{});
@@ -1622,7 +1759,7 @@ function vtModell(){
     const nf=S.aktNew=S.aktNew||{typ:'prozent'};
     const inp=(id,label,attrs)=>h('div',{class:'field'},h('label',{for:id},label),h('input',Object.assign({id},attrs)));
     const typSel=h('select',{id:'ak-typ',onchange:e=>{nf.typ=e.target.value;render._force=true;render();}},...Object.entries(AKT_TYP).map(([k,t])=>{const o=h('option',{value:k},t);if(nf.typ===k)o.selected=true;return o;}));
-    const stBox=nf.typ==='gross'?h('div',{class:'field'},h('label',null,'Gilt für Staffeln'),h('div',{class:'chips'},...c.staffeln.slice(1).map(x=>h('label',{class:'chip',style:'display:inline-flex;align-items:center;gap:6px'},h('input',{type:'checkbox',class:'ak-st',value:x.id,checked:true}),x.label)))):null;
+    const stBox=nf.typ==='gross'?h('div',{class:'field'},h('label',null,'Gilt für Staffeln'),h('div',{class:'chips'},...allStaffeln().filter(x=>!x.individuell).map(x=>h('label',{class:'chip',style:'display:inline-flex;align-items:center;gap:6px'},h('input',{type:'checkbox',class:'ak-st',value:x.id,checked:staffelnOf(x.pid)[0]?staffelnOf(x.pid)[0].id!==x.id:true}),(prodAll().length>1?x.pname+': ':'')+x.label)))):null;
     out.push(h('section',{class:'card'},h('h2',null,'Incentive-Aktionen'),
       totalShare>=80?h('div',{class:'banner warn'},'Mit allen eingeschalteten Aktionen gehen bis zu '+pct(totalShare)+' der Einrichtung an Partner (dazu ggf. Festbeträge). Deine Marge an der Einrichtung der kleinsten Staffel: '+eur(r2(small*(100-totalShare)/100-setupCost()))+' nach Einrichtungszeit.'):null,
       h('p',{class:'eyebrow',style:'margin:0'},'Zeitlich begrenzte Zusatzprovisionen, jederzeit ein- und ausschaltbar. Sie gelten nur für bezahlte Einrichtungen im Aktionszeitraum – nie für das Anwerben selbst. Die Starthilfe erhält der Werber nur beim ersten bezahlten Kunden eines neuen Partners (höchstens 6 Monate nach Vertragsbeginn) und nur, wenn er die Aktivitätsbedingung erfüllt; sie kommt aus dem ONLION-Anteil, Ebene 2 erhält bei diesem Abschluss nichts.'),
@@ -1820,10 +1957,12 @@ function render(){
   const a=document.activeElement;
   if(a&&a.closest&&a.closest('#view')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.type!=='checkbox'&&!render._force){S.pendingRender=true;renderSide();return;}
   render._force=false;
+  {const c0=cur();if(c0&&!SETTINGS.includes(S.view))S.prod=pidOf(c0);}
   renderSide();
   S.progEls=[];const v=document.getElementById('view');const c=cur();let kids;
   if(S.blocked)kids=[viewNoAccess()];
-  else if(S.view==='vorlagen'&&isAdmin())kids=viewVorlagen();
+  else if(S.view==='produkte'&&isAdmin())kids=viewProdukte();
+  else if(S.view==='produkt')kids=viewProdukt(S.prod);
   else if(S.view==='konto')kids=viewKonto();
   else if(S.view==='dashboard')kids=viewDashboard();
   else if(S.view==='vertrieb')kids=viewVertrieb();
@@ -1834,7 +1973,7 @@ function render(){
 }
 document.addEventListener('focusout',()=>{setTimeout(()=>{const a=document.activeElement;const typing=a&&a.closest&&a.closest('#view')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);if(S.pendingRender&&!typing&&S.view!=='unterschrift'){S.pendingRender=false;render();}},50);});
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button');if(b)render._force=true;setTimeout(()=>render._force=false,0);},true);
-document.getElementById('navTpl').addEventListener('click',()=>{S.view='vorlagen';render();});
+document.getElementById('navTpl').addEventListener('click',()=>{S.view='produkte';S.prodEdit=S.prod;S.confirm=null;S.newProd=null;render();window.scrollTo(0,0);});
 document.getElementById('homeLink').addEventListener('click',e=>{e.preventDefault();if(S.blocked)return;S.view='dashboard';S.confirm=null;render();window.scrollTo(0,0);});
 document.getElementById('navDash').addEventListener('click',()=>{S.view='dashboard';render();window.scrollTo(0,0);});
 document.getElementById('navVertrieb').addEventListener('click',()=>{S.view='vertrieb';S.confirm=null;S.editPartner=null;render();window.scrollTo(0,0);});
@@ -1985,15 +2124,21 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.s
     if(S.view==='unterschrift'&&!signed(cur())){renderSide();return;}
     render();
   },e=>{S.loaded=true;toast('Kunden konnten nicht geladen werden.');render();});
-  db.doc('templates/'+TPL_ID).onSnapshot(s=>{
-    const a=document.activeElement;if(S.view==='vorlagen'&&a&&a.closest&&a.closest('#view'))return;
-    S.tpl=s.exists?JSON.parse(JSON.stringify(s.data())):null;
-    if(S.tpl&&JSON.stringify(S.tpl).includes('mehr Finanzierungs-Leads?')){S.tpl=JSON.parse(JSON.stringify(S.tpl).split('mehr Finanzierungs-Leads?').join('mehr Käufer- und Verkäufer-Leads?'));db.doc('templates/'+TPL_ID).set(S.tpl).catch(()=>{});}
-    if(S.tpl&&S.tpl.name)document.getElementById('prodName').textContent=S.tpl.product||'KI-Telefon-Agent';
+  // Produkte, Fragenkataloge und Rechtstexte (je Produkt ein Dokument)
+  const typing=()=>{const a=document.activeElement;return a&&a.closest&&a.closest('#view')&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);};
+  db.doc('config/produkte').onSnapshot(sn=>{S.produkte=sn.exists?sn.data():null;if(!typing())render();},()=>{});
+  db.collection('templates').onSnapshot(snap=>{
+    if(S.view==='produkte'&&typing())return;
+    const m={};for(const d of snap.docs)m[d.id]=JSON.parse(JSON.stringify(d.data()));
+    const t=m[DEF_PID];if(t&&JSON.stringify(t).includes('mehr Finanzierungs-Leads?')){m[DEF_PID]=JSON.parse(JSON.stringify(t).split('mehr Finanzierungs-Leads?').join('mehr Käufer- und Verkäufer-Leads?'));db.doc('templates/'+DEF_PID).set(m[DEF_PID]).catch(()=>{});}
+    S.tpls=m;
     if(S.view==='unterschrift'&&!signed(cur())){renderSide();return;}render();});
-  db.doc('legal/'+LEGAL_ID).onSnapshot(s=>{
-    const a=document.activeElement;if(S.view==='vorlagen'&&a&&a.closest&&a.closest('#view'))return;
-    S.legal=s.exists?JSON.parse(JSON.stringify(s.data())):null;if(S.legal&&JSON.stringify(S.legal).includes('fragt er, ob')){S.legal=JSON.parse(JSON.stringify(S.legal).split('fragt er, ob').join('fragt der Assistent, ob'));db.doc('legal/'+LEGAL_ID).set(S.legal).catch(()=>{});}if(S.view==='datenschutz'&&S._drawPreview)S._drawPreview();else if(S.view==='unterschrift'&&!signed(cur()))renderSide();else render();});
+  db.collection('legal').onSnapshot(snap=>{
+    if(S.view==='produkte'&&typing())return;
+    const m={};for(const d of snap.docs)m[d.id]=JSON.parse(JSON.stringify(d.data()));
+    const l=m[DEF_PID];if(l&&JSON.stringify(l).includes('fragt er, ob')){m[DEF_PID]=JSON.parse(JSON.stringify(l).split('fragt er, ob').join('fragt der Assistent, ob'));db.doc('legal/'+DEF_PID).set(m[DEF_PID]).catch(()=>{});}
+    S.legals=m;
+    if(S.view==='datenschutz'&&S._drawPreview)S._drawPreview();else if(S.view==='unterschrift'&&!signed(cur()))renderSide();else render();});
 })();
 })();
 </script>
