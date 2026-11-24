@@ -1,6 +1,6 @@
 // Service Worker: App-Gerüst zwischenspeichern, Daten immer live von Supabase.
-const CACHE = 'onlion-onboarding-v1';
-const ASSETS = ['./', 'index.html', 'config.js', 'manifest.webmanifest', 'logo-white.png', 'logo-black.png', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
+const CACHE = 'onlion-onboarding-v2';
+const ASSETS = ['./', 'index.html', 'config.js', 'manifest.webmanifest', 'logo-white.png', 'logo-black.png', 'icon-192.png', 'icon-512.png', 'icon-512-maskable.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
